@@ -19,6 +19,9 @@ namespace Game.Combat
         /// <summary>属性 DoT:属性衰减按一半计入。</summary>
         public bool IsDot;
 
+        /// <summary>激光束标记:只有光束享受热熔易伤。</summary>
+        public bool Beam;
+
         public EntityId Source;
     }
 }

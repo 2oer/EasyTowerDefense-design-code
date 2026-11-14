@@ -1,0 +1,12 @@
+<Project>
+  <!--
+    把 dotnet 的中间产物与输出移出 Assets/。
+    Unity 会把 Assets 下所有 .cs 编进 Assembly-CSharp,obj/ 里的
+    AssemblyInfo / AssemblyAttributes 会造成重复定义错误。
+    仅对本仓库的核心类库与 SimHarness 生效,不影响 Unity 自己生成的工程文件。
+  -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'SimHarness' or $(MSBuildProjectName.StartsWith('Game.'))">
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory).build\obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+    <BaseOutputPath>$(MSBuildThisFileDirectory).build\bin\$(MSBuildProjectName)\</BaseOutputPath>
+  </PropertyGroup>
+</Project>

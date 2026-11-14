@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Game.Combat;
 using Game.Core;
 using Game.Entity;
 using Game.Model;
@@ -23,11 +24,16 @@ namespace Game.Battle
         private readonly EconomySystem _economy;
         private readonly UpgradeService _upgrades;
         private readonly List<EnemyRuntime> _hitBuffer = new List<EnemyRuntime>();
+        private readonly CombatWorld _combat;
+        private readonly List<IAoETarget> _targetBuffer = new List<IAoETarget>();
 
         private readonly List<string> _buildOrder = new List<string>
         {
             "laser", "machine_gun", "machine_gun", "laser"
         };
+
+        /// <summary>槽位 → 塔索引。玩家接管建造时也走这张表,避免重复占位。</summary>
+        private readonly Dictionary<int, int> _slotToTower = new Dictionary<int, int>();
 
         /// <summary>机枪塔路线:快速供弹 → 高速枪机 → 电磁反器材 → 重型弹芯 → 快速充能 → 低温超导钢芯。</summary>
         private static readonly string[] MgUpgradePath =
@@ -55,8 +61,9 @@ namespace Game.Battle
         private int _builtCount;
 
         public BattleSimulation(ModelDatabase db, string difficultyId, string mapId, ulong seed,
-            float baseMaxHpOverride = 0f, string laserBranch = "focus")
+            float baseMaxHpOverride = 0f, string laserBranch = "focus", bool autoPlay = true)
         {
+            AutoPlay = autoPlay;
             _laserPath = string.Equals(laserBranch, "sweep", StringComparison.OrdinalIgnoreCase)
                 ? LaserSweepPath
                 : LaserFocusPath;
@@ -74,11 +81,13 @@ namespace Game.Battle
             _director = new WaveDirector(db, difficulty, map, _rng);
             _economy = new EconomySystem(difficulty);
             _upgrades = new UpgradeService(db, _economy);
+            _combat = new CombatWorld(db.Effects);
+            _combat.SquadConsumed = OnSquadConsumed;
 
             BaseMaxHp = baseMaxHpOverride > 0f ? baseMaxHpOverride : map.BaseMaxHp;
             BaseHp = BaseMaxHp;
 
-            TryBuild();
+            if (AutoPlay) TryBuild();
         }
 
         public Action<int>? OnWaveStart;
@@ -103,8 +112,24 @@ namespace Game.Battle
         public bool BaseDestroyed { get; private set; }
         public bool Finished => BaseDestroyed || _director.AllWavesDone;
 
+        /// <summary>
+        /// true = 旧的自 build / 自升级(AI 演示);false = 由 UI 调用 TryBuildTower / TryUpgradeTower。
+        /// 默认保持 true,不影响既有的确定性回归。
+        /// </summary>
+        public bool AutoPlay { get; set; } = true;
+
+        public IReadOnlyList<SlotDef> Slots => _map.Slots;
+        public bool InPrep => _director.InPrep;
+
         public IReadOnlyList<EnemyRuntime> Enemies => _world.Enemies;
         public IReadOnlyList<TowerAgent> Towers => _world.Towers;
+        public CombatWorld Combat => _combat;
+
+        private void OnSquadConsumed(int towerIndex, int drones)
+        {
+            if (towerIndex < 0 || towerIndex >= _world.Towers.Count) return;
+            _world.Towers[towerIndex].OnSquadConsumed(drones);
+        }
 
         public void Begin(int maxWaves)
         {
@@ -125,8 +150,11 @@ namespace Game.Battle
                 WaveLeaks = 0;
                 WaveGold = 0;
                 WaveSpawned = 0;
-                TryBuild();
-                TryUpgrade();
+                if (AutoPlay)
+                {
+                    TryBuild();
+                    TryUpgrade();
+                }
                 OnWaveStart?.Invoke(wave);
             }
 
@@ -134,16 +162,20 @@ namespace Game.Battle
             {
                 SpawnRequest request = _director.PendingSpawns[i];
                 float hp = request.Def.Hp * HpScale(_director.Wave);
-                _world.SpawnEnemy(request.Def, request.Position, hp);
+                _world.SpawnEnemy(request.Def, request.Position, hp, _db.Effects);
                 Spawned++;
                 WaveSpawned++;
             }
             _director.PendingSpawns.Clear();
 
+            SyncCombatTargets();
+
             for (int i = 0; i < _world.Towers.Count; i++)
             {
-                _world.Towers[i].Tick(Dt, _world.Enemies, _hitBuffer);
+                _world.Towers[i].Tick(Dt, _world.Enemies, _hitBuffer, _combat);
             }
+
+            _combat.Tick(Dt);
 
             var basePosition = new Vec2(_map.BaseX, _map.BaseY);
             for (int i = 0; i < _world.Enemies.Count; i++)
@@ -219,6 +251,19 @@ namespace Game.Battle
             return h;
         }
 
+        private void SyncCombatTargets()
+        {
+            _targetBuffer.Clear();
+            for (int i = 0; i < _world.Enemies.Count; i++)
+            {
+                EnemyRuntime enemy = _world.Enemies[i];
+                if (enemy.Alive) _targetBuffer.Add(enemy);
+            }
+
+            _combat.Targets.Clear();
+            _combat.Targets.AddRange(_targetBuffer);
+        }
+
         /// <summary>出生线 = 固定塔最远射程 + 缓冲,随射程成长实时外移。</summary>
         private float ResolveSpawnY()
         {
@@ -260,7 +305,8 @@ namespace Game.Battle
                 if (!_economy.TrySpend(def.Price)) break;
 
                 SlotDef slot = _map.Slots[_builtCount];
-                _world.AddTower(def, new Vec2(slot.X, slot.Y));
+                TowerAgent tower = _world.AddTower(def, new Vec2(slot.X, slot.Y));
+                _slotToTower[_builtCount] = tower.Id.Index;
                 _builtCount++;
             }
         }
@@ -335,6 +381,54 @@ namespace Game.Battle
             hash ^= value;
             hash *= 1099511628211UL;
             return hash;
+        }
+
+        // ---- 玩家接管接口(UI 调用;AutoPlay = false 时使用) --------------------
+
+        public bool IsSlotOccupied(int slotIndex) => _slotToTower.ContainsKey(slotIndex);
+
+        public int TowerIndexAtSlot(int slotIndex) =>
+            _slotToTower.TryGetValue(slotIndex, out int index) ? index : -1;
+
+        /// <summary>在指定槽位建造;金币不足 / 槽位占用 / id 非法时返回 false。</summary>
+        public bool TryBuildTower(string towerId, int slotIndex)
+        {
+            if (Finished) return false;
+            if (slotIndex < 0 || slotIndex >= _map.Slots.Count) return false;
+            if (_slotToTower.ContainsKey(slotIndex)) return false;
+
+            TowerDef? def = _db.FindTower(towerId);
+            if (def == null) return false;
+            if (!_economy.TrySpend(def.Price)) return false;
+
+            SlotDef slot = _map.Slots[slotIndex];
+            TowerAgent tower = _world.AddTower(def, new Vec2(slot.X, slot.Y));
+            _slotToTower[slotIndex] = tower.Id.Index;
+            return true;
+        }
+
+        public int UpgradeCostOf(int towerIndex, string nodeId)
+        {
+            if (towerIndex < 0 || towerIndex >= _world.Towers.Count) return 0;
+            UpgradeNodeDef? node = _db.FindUpgrade(nodeId);
+            return node == null ? 0 : _upgrades.Cost(_world.Towers[towerIndex].Def, node);
+        }
+
+        public bool CanApplyUpgrade(int towerIndex, string nodeId)
+        {
+            if (towerIndex < 0 || towerIndex >= _world.Towers.Count) return false;
+            UpgradeNodeDef? node = _db.FindUpgrade(nodeId);
+            return node != null && _upgrades.CanApply(_world.Towers[towerIndex], node);
+        }
+
+        /// <summary>应用升级;成功时通过 OnUpgrade 广播,便于表现层播特效 / 音效。</summary>
+        public bool TryUpgradeTower(int towerIndex, string nodeId, out int cost)
+        {
+            cost = 0;
+            if (towerIndex < 0 || towerIndex >= _world.Towers.Count) return false;
+            if (!_upgrades.TryApply(_world.Towers[towerIndex], nodeId, out cost)) return false;
+            OnUpgrade?.Invoke(towerIndex, nodeId, cost);
+            return true;
         }
     }
 }

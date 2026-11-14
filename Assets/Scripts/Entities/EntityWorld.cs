@@ -13,10 +13,10 @@ namespace Game.Entity
         public List<EnemyRuntime> Enemies { get; } = new List<EnemyRuntime>();
         public List<TowerAgent> Towers { get; } = new List<TowerAgent>();
 
-        public EnemyRuntime SpawnEnemy(EnemyDef def, Vec2 position, float hp)
+        public EnemyRuntime SpawnEnemy(EnemyDef def, Vec2 position, float hp, StatusRules statusRules)
         {
             var enemy = new EnemyRuntime();
-            enemy.Initialize(new EntityId(_nextEnemyIndex++, 0), def, position, hp);
+            enemy.Initialize(new EntityId(_nextEnemyIndex++, 0), def, position, hp, statusRules);
             Enemies.Add(enemy);
             return enemy;
         }

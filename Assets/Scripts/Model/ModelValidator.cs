@@ -68,6 +68,7 @@ namespace Game.Model
             }
 
             ValidateUpgrades(db);
+            ValidateEffects(db.Effects);
 
             if (db.FindDifficulty("normal") == null)
                 throw new ModelValidationException("缺少 normal 难度");
@@ -138,6 +139,93 @@ namespace Game.Model
                     if (mod.Op == ModifierOp.Mul && mod.Value <= 0f)
                         throw new ModelValidationException(u.Id + ": Mul 修饰值必须 > 0");
                 }
+            }
+        }
+
+        private static void ValidateEffects(StatusRules effects)
+        {
+            if (effects == null) throw new ModelValidationException("effects 规则缺失");
+
+            BurnRule burn = effects.Burn;
+            if (burn == null) throw new ModelValidationException("effects.burn 缺失");
+            if (burn.MaxStacks <= 0) throw new ModelValidationException("burn.maxStacks 必须 > 0");
+            if (burn.Duration <= 0f) throw new ModelValidationException("burn.duration 必须 > 0");
+            if (burn.TickInterval <= 0f) throw new ModelValidationException("burn.tickInterval 必须 > 0");
+            if (burn.BaseDamagePerSecond <= 0f)
+                throw new ModelValidationException("burn.baseDamagePerSecond 必须 > 0");
+            if (burn.StackMultipliers.Count != burn.MaxStacks)
+                throw new ModelValidationException("burn.stackMultipliers 长度必须等于 maxStacks");
+            for (int i = 0; i < burn.StackMultipliers.Count; i++)
+            {
+                if (burn.StackMultipliers[i] <= 0f)
+                    throw new ModelValidationException("burn.stackMultipliers 必须 > 0");
+            }
+
+            ChillRule chill = effects.Chill;
+            if (chill == null) throw new ModelValidationException("effects.chill 缺失");
+            if (chill.MaxStacks <= 0) throw new ModelValidationException("chill.maxStacks 必须 > 0");
+            if (chill.Duration <= 0f) throw new ModelValidationException("chill.duration 必须 > 0");
+            if (chill.ThresholdReductions.Count != chill.MaxStacks)
+                throw new ModelValidationException("chill.thresholdReductions 长度必须等于 maxStacks");
+            float reductionSum = 0f;
+            for (int i = 0; i < chill.ThresholdReductions.Count; i++)
+            {
+                float r = chill.ThresholdReductions[i];
+                if (r < 0f || r >= 1f)
+                    throw new ModelValidationException("chill.thresholdReductions 必须落在 [0,1)");
+                reductionSum += r;
+            }
+            if (reductionSum >= 1f)
+                throw new ModelValidationException("chill 满层阈值降幅必须 < 100%");
+            if (chill.MaxStackElementalDecayScale < 0f || chill.MaxStackElementalDecayScale > 1f)
+                throw new ModelValidationException("chill.maxStackElementalDecayScale 必须落在 [0,1]");
+
+            HeatMeltRule heat = effects.HeatMelt;
+            if (heat == null) throw new ModelValidationException("effects.heatMelt 缺失");
+            if (heat.MaxMultiplier < 1f) throw new ModelValidationException("heatMelt.maxMultiplier 必须 ≥ 1");
+            if (heat.RampSeconds <= 0f) throw new ModelValidationException("heatMelt.rampSeconds 必须 > 0");
+
+            if (effects.ArmorBreak == null) throw new ModelValidationException("effects.armorBreak 缺失");
+            if (effects.ArmorBreak.Duration <= 0f)
+                throw new ModelValidationException("armorBreak.duration 必须 > 0");
+
+            ChargeRule charge = effects.Charge;
+            if (charge == null) throw new ModelValidationException("effects.charge 缺失");
+            if (charge.MaxStacks <= 0) throw new ModelValidationException("charge.maxStacks 必须 > 0");
+            if (charge.BaseDamage <= 0f) throw new ModelValidationException("charge.baseDamage 必须 > 0");
+            if (charge.StackDamageBonus < 0f)
+                throw new ModelValidationException("charge.stackDamageBonus 不得为负");
+            if (charge.RadiusByStacks.Count != charge.MaxStacks)
+                throw new ModelValidationException("charge.radiusByStacks 长度必须等于 maxStacks");
+            for (int i = 0; i < charge.RadiusByStacks.Count; i++)
+            {
+                if (charge.RadiusByStacks[i] <= 0f)
+                    throw new ModelValidationException("charge.radiusByStacks 必须 > 0");
+            }
+
+            DecayRule decay = effects.Decay;
+            if (decay == null) throw new ModelValidationException("effects.decay 缺失");
+            if (decay.MaxStacks <= 0) throw new ModelValidationException("decay.maxStacks 必须 > 0");
+            if (decay.TickInterval <= 0f) throw new ModelValidationException("decay.tickInterval 必须 > 0");
+            if (decay.ExponentBase <= 1f) throw new ModelValidationException("decay.exponentBase 必须 > 1");
+
+            var areaIds = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < effects.Areas.Count; i++)
+            {
+                AreaEffectRule area = effects.Areas[i];
+                if (string.IsNullOrWhiteSpace(area.Id))
+                    throw new ModelValidationException("区域效果 id 为空");
+                if (!areaIds.Add(area.Id))
+                    throw new ModelValidationException(area.Id + ": 区域效果 id 重复");
+                if (area.Kind != StatusKind.Burn && area.Kind != StatusKind.Chill)
+                    throw new ModelValidationException(area.Id + ": 区域只支持 Burn / Chill");
+                if (area.Duration <= 0f) throw new ModelValidationException(area.Id + ": duration 必须 > 0");
+                if (area.ApplyInterval <= 0f)
+                    throw new ModelValidationException(area.Id + ": applyInterval 必须 > 0");
+                if (area.StacksPerApply <= 0)
+                    throw new ModelValidationException(area.Id + ": stacksPerApply 必须 > 0");
+                if (area.BlockForce < 0f)
+                    throw new ModelValidationException(area.Id + ": blockForce 不得为负");
             }
         }
 

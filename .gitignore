@@ -5,13 +5,35 @@ obj/
 .vs/
 TestResults/
 *.log
+.build/
 
 # Trae / 本地工具产物
 .markdown-collab/
 .trae-html-share-packages/
 
-# Unity(尚未创建工程,预留)
-Library/
-Temp/
-Logs/
-UserSettings/
+# Unity
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/[Mm]emoryCaptures/
+/[Rr]ecordings/
+*.csproj.user
+*.pidb
+*.booproj
+*.svd
+*.opendb
+*.VC.db
+sysinfo.txt
+*.apk
+*.aab
+*.unitypackage
+*.app
+
+# Unity 自动生成的解决方案 / 工程文件(根目录)
+/Assembly-CSharp*.csproj
+/Game.*.csproj
+/*.sln.DotSettings.user

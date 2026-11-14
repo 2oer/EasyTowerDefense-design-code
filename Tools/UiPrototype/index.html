@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>防线指挥 · 界面设计原型</title>
+<style>
+  :root {
+    --bg: #060a11;
+    --panel: rgba(13, 21, 34, 0.9);
+    --panel-2: rgba(21, 33, 50, 0.7);
+    --line: rgba(96, 158, 214, 0.18);
+    --line-2: rgba(96, 158, 214, 0.35);
+    --text: #dbe7f5;
+    --muted: #7f93ab;
+    --cyan: #38e1ff;
+    --amber: #ffb545;
+    --danger: #ff5470;
+    --gold: #ffd166;
+    --green: #55e6a5;
+    --violet: #a98bff;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background:
+      radial-gradient(1100px 700px at 15% -10%, #0f2034 0%, transparent 60%),
+      radial-gradient(900px 600px at 105% 110%, #0e1e2c 0%, transparent 55%),
+      var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  }
+  #app { height: 100vh; display: flex; flex-direction: column; gap: 10px; padding: 12px; }
+
+  /* 顶栏 */
+  .hud {
+    display: flex; align-items: center; gap: 20px; padding: 10px 16px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  }
+  .brand { display: flex; align-items: baseline; gap: 10px; padding-right: 18px; border-right: 1px solid var(--line); }
+  .brand h1 { margin: 0; font-size: 17px; letter-spacing: 3px; font-weight: 600; }
+  .brand span { font-size: 10px; color: var(--muted); letter-spacing: 1.5px; }
+  .stat { display: flex; flex-direction: column; gap: 2px; min-width: 76px; }
+  .stat .k { font-size: 10px; color: var(--muted); letter-spacing: 1px; }
+  .stat .v { font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .gold { color: var(--gold); } .hp { color: var(--green); } .wave { color: var(--cyan); }
+  .spacer { flex: 1; }
+  .hud-actions { display: flex; gap: 8px; }
+  button {
+    font: inherit; color: var(--text); background: rgba(52, 82, 116, 0.26);
+    border: 1px solid var(--line-2); border-radius: 9px; padding: 7px 14px; cursor: pointer;
+    transition: background .15s, border-color .15s;
+  }
+  button:hover { background: rgba(72, 118, 164, 0.38); border-color: rgba(120, 205, 255, 0.5); }
+  button.primary { background: rgba(56, 225, 255, 0.14); border-color: rgba(56, 225, 255, 0.45); color: #bdf3ff; }
+
+  /* 主区 */
+  main { flex: 1; display: grid; grid-template-columns: 264px minmax(0, 1fr) 344px; gap: 10px; min-height: 0; }
+  .panel {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    display: flex; flex-direction: column; min-height: 0; overflow: hidden;
+  }
+  .panel-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 14px 10px; border-bottom: 1px solid var(--line);
+  }
+  .panel-head h2 { margin: 0; font-size: 12px; letter-spacing: 2px; color: #9fc0dd; font-weight: 600; }
+  .panel-head .hint { font-size: 10px; color: var(--muted); }
+  .scroll { overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .scroll::-webkit-scrollbar { width: 6px; }
+  .scroll::-webkit-scrollbar-thumb { background: rgba(96, 158, 214, 0.26); border-radius: 3px; }
+
+  /* 塔卡 */
+  .card {
+    display: flex; gap: 10px; padding: 9px; border: 1px solid var(--line);
+    border-radius: 11px; background: var(--panel-2); cursor: pointer; position: relative;
+    transition: border-color .15s, background .15s, transform .1s;
+  }
+  .card:hover { border-color: rgba(120, 205, 255, 0.5); transform: translateY(-1px); }
+  .card.active { border-color: var(--cyan); background: rgba(56, 225, 255, 0.09); }
+  .thumb {
+    width: 56px; height: 56px; flex: 0 0 56px; border-radius: 9px;
+    background: #0b1626 center/cover no-repeat; border: 1px solid rgba(96, 158, 214, 0.22);
+  }
+  .body { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
+  .title { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .title b { font-size: 13px; font-weight: 600; }
+  .title .price { color: var(--gold); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .desc { font-size: 10.5px; color: var(--muted); line-height: 1.45; }
+  .tags { display: flex; gap: 4px; flex-wrap: wrap; }
+  .tag {
+    font-size: 9.5px; padding: 1px 6px; border-radius: 999px;
+    border: 1px solid rgba(96, 158, 214, 0.3); color: #9fb8d0; white-space: nowrap;
+  }
+  .tag.amber { color: var(--amber); border-color: rgba(255, 181, 69, 0.42); }
+  .tag.violet { color: var(--violet); border-color: rgba(169, 139, 255, 0.42); }
+  .tag.cyan { color: #7ee0ff; border-color: rgba(126, 224, 255, 0.42); }
+  .tag.green { color: var(--green); border-color: rgba(85, 230, 165, 0.42); }
+  .badge-missing {
+    position: absolute; right: 8px; bottom: 8px; font-size: 9px; color: var(--amber);
+    border: 1px dashed rgba(255, 181, 69, 0.5); border-radius: 5px; padding: 1px 5px;
+  }
+
+  /* 战场 */
+  #stage {
+    position: relative; border: 1px solid var(--line); border-radius: 14px; overflow: hidden;
+    background: linear-gradient(180deg, #081120 0%, #050a12 100%);
+    display: flex; align-items: center; justify-content: center;
+  }
+  #stage svg { height: 100%; width: 100%; }
+  .stage-top { position: absolute; top: 10px; left: 12px; display: flex; gap: 8px; }
+  .chip {
+    font-size: 10px; letter-spacing: 1px; color: #9fc0dd; background: rgba(8, 16, 28, .8);
+    border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px;
+  }
+  .stage-legend {
+    position: absolute; bottom: 12px; left: 12px; display: flex; gap: 14px;
+    font-size: 10px; color: var(--muted);
+  }
+  .stage-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
+
+  /* 右侧 */
+  .mechanic-box {
+    margin: 10px 10px 0; padding: 10px; border-radius: 10px;
+    border: 1px dashed rgba(56, 225, 255, 0.3); background: rgba(56, 225, 255, 0.05);
+    font-size: 11px; line-height: 1.55; color: #b7d6ee;
+  }
+  .mechanic-box b { color: var(--cyan); font-weight: 600; }
+  .kv { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; padding: 10px; }
+  .kv div { font-size: 11px; color: var(--muted); display: flex; justify-content: space-between; gap: 6px; }
+  .kv div span { color: var(--text); font-variant-numeric: tabular-nums; }
+
+  .node {
+    border: 1px solid var(--line); border-radius: 10px; background: var(--panel-2);
+    padding: 9px 10px; display: flex; flex-direction: column; gap: 5px;
+  }
+  .node.unique { border-color: rgba(255, 181, 69, 0.42); background: rgba(255, 181, 69, 0.06); }
+  .node.sel { border-color: var(--cyan); box-shadow: 0 0 0 1px rgba(56, 225, 255, 0.2) inset; }
+  .node .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .node .name { font-size: 12px; font-weight: 600; }
+  .node .lv { font-size: 10px; color: var(--muted); letter-spacing: 1px; }
+  .node .mods { font-size: 10px; color: #9fb8d0; line-height: 1.5; }
+  .node .mech { font-size: 10px; color: var(--amber); }
+  .node .cost { color: var(--gold); font-size: 11px; }
+  .empty-state { color: var(--muted); font-size: 11.5px; line-height: 1.7; text-align: center; padding: 24px 12px; }
+
+  /* 事件条 */
+  footer {
+    flex: 0 0 92px; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 14px; padding: 8px 14px; overflow: hidden;
+  }
+  footer h3 { margin: 0 0 4px; font-size: 10px; letter-spacing: 2px; color: var(--muted); font-weight: 600; }
+  #log { font-size: 11px; line-height: 1.7; color: #9fb8d0; }
+  #log b { color: var(--cyan); font-weight: 500; }
+  #log .ok { color: var(--green); }
+  #log .warn { color: var(--amber); }
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="hud">
+    <div class="brand">
+      <h1>防线指挥</h1>
+      <span>UI DESIGN MOCK · v1</span>
+    </div>
+    <div class="stat"><div class="k">金币</div><div class="v gold">300</div></div>
+    <div class="stat"><div class="k">基地耐久</div><div class="v hp">15 000</div></div>
+    <div class="stat"><div class="k">波次</div><div class="v wave">1 / 30</div></div>
+    <div class="stat"><div class="k">难度</div><div class="v">普通</div></div>
+    <div class="spacer"></div>
+    <div class="hud-actions">
+      <button>速度 ×1</button>
+      <button>暂停</button>
+      <button class="primary">开始波次</button>
+    </div>
+  </header>
+
+  <main>
+    <aside class="panel">
+      <div class="panel-head">
+        <h2>建造</h2>
+        <span class="hint">选槽位 → 选塔</span>
+      </div>
+      <div class="scroll" id="buildList"></div>
+    </aside>
+
+    <section id="stage">
+      <svg viewBox="0 0 400 620" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <pattern id="grid" width="25" height="25" patternUnits="userSpaceOnUse">
+            <path d="M25 0H0V25" fill="none" stroke="rgba(70,120,170,.10)" stroke-width="1"/>
+          </pattern>
+          <radialGradient id="baseGlow">
+            <stop offset="0%" stop-color="rgba(56,225,255,.30)"/>
+            <stop offset="100%" stop-color="rgba(56,225,255,0)"/>
+          </radialGradient>
+          <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+            <path d="M0 0L10 5L0 10z" fill="rgba(126,224,255,.45)"/>
+          </marker>
+        </defs>
+
+        <rect width="400" height="620" fill="url(#grid)"/>
+
+        <!-- 敌人推进方向 -->
+        <g stroke="rgba(126,224,255,.18)" stroke-width="1.2" stroke-dasharray="5 7">
+          <line x1="60" y1="40" x2="60" y2="500" marker-end="url(#arrow)"/>
+          <line x1="200" y1="30" x2="200" y2="500" marker-end="url(#arrow)"/>
+          <line x1="340" y1="40" x2="340" y2="500" marker-end="url(#arrow)"/>
+        </g>
+
+        <!-- 敌人示意 -->
+        <g fill="rgba(10,18,28,.9)" stroke-width="1.6">
+          <circle cx="60" cy="120" r="7" stroke="#7ee0ff"/>
+          <circle cx="74" cy="150" r="7" stroke="#7ee0ff"/>
+          <circle cx="200" cy="90" r="11" stroke="#ffb545"/>
+          <circle cx="340" cy="140" r="7" stroke="#7ee0ff"/>
+          <circle cx="322" cy="176" r="16" stroke="#ff5470"/>
+          <circle cx="200" cy="240" r="11" stroke="#ffb545"/>
+          <circle cx="200" cy="300" r="16" stroke="#ff5470"/>
+        </g>
+        <g fill="rgba(0,0,0,.5)">
+          <rect x="53" y="109" width="14" height="2.5" fill="#55e6a5"/>
+          <rect x="193" y="76" width="14" height="2.5" fill="#ffd166"/>
+          <rect x="315" y="120" width="14" height="2.5" fill="#55e6a5"/>
+          <rect x="306" y="157" width="32" height="3" fill="#ffd166"/>
+        </g>
+
+        <!-- 建造槽位 -->
+        <g fill="rgba(22,36,54,.75)" stroke="rgba(96,158,214,.35)" stroke-width="1.2">
+          <polygon points="110,414 128,424 128,444 110,454 92,444 92,424" />
+          <polygon points="290,414 308,424 308,444 290,454 272,444 272,424" />
+          <polygon points="150,484 168,494 168,514 150,524 132,514 132,494" />
+          <polygon points="250,484 268,494 268,514 250,524 232,514 232,494" />
+        </g>
+        <g fill="rgba(140,180,220,.45)" font-size="14" text-anchor="middle" font-family="Segoe UI">
+          <text x="110" y="441">+</text>
+          <text x="290" y="441">+</text>
+          <text x="150" y="511">+</text>
+          <text x="250" y="511">+</text>
+        </g>
+
+        <!-- 已建塔示意 -->
+        <g>
+          <circle cx="110" cy="434" r="13" fill="#121f30" stroke="rgba(126,224,255,.55)" stroke-width="1.4"/>
+          <line x1="110" y1="434" x2="148" y2="400" stroke="#ffd9a0" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="110" cy="434" r="70" fill="none" stroke="rgba(56,225,255,.14)" stroke-dasharray="5 7"/>
+
+          <circle cx="290" cy="434" r="13" fill="#121f30" stroke="rgba(169,139,255,.55)" stroke-width="1.4"/>
+          <line x1="290" y1="434" x2="240" y2="410" stroke="#a98bff" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="290" cy="434" r="55" fill="none" stroke="rgba(169,139,255,.13)" stroke-dasharray="5 7"/>
+
+          <circle cx="150" cy="504" r="13" fill="#121f30" stroke="rgba(255,181,69,.55)" stroke-width="1.4"/>
+          <line x1="150" y1="504" x2="150" y2="470" stroke="#ffb545" stroke-width="5" stroke-linecap="round"/>
+          <polygon points="150,504 118,530 182,530" fill="none" stroke="rgba(255,181,69,.16)" stroke-dasharray="4 6"/>
+          <circle cx="150" cy="504" r="34" fill="none" stroke="rgba(255,84,112,.22)" stroke-dasharray="3 4"/>
+
+          <circle cx="250" cy="504" r="13" fill="#121f30" stroke="rgba(85,230,165,.55)" stroke-width="1.4"/>
+          <line x1="250" y1="504" x2="250" y2="476" stroke="#55e6a5" stroke-width="3" stroke-linecap="round"/>
+          <g fill="rgba(85,230,165,.85)">
+            <polygon points="250,462 254,470 246,470"/>
+            <polygon points="238,470 242,478 234,478"/>
+            <polygon points="262,470 266,478 258,478"/>
+          </g>
+        </g>
+
+        <!-- 基地 -->
+        <circle cx="200" cy="566" r="58" fill="url(#baseGlow)"/>
+        <polygon points="200,540 224,554 224,582 200,596 176,582 176,554"
+                 fill="rgba(56,225,255,.10)" stroke="rgba(56,225,255,.6)" stroke-width="1.6"/>
+        <text x="200" y="571" font-size="10" fill="rgba(210,242,255,.9)" text-anchor="middle"
+              font-family="Segoe UI" letter-spacing="1">BASE</text>
+      </svg>
+
+      <div class="stage-top">
+        <div class="chip">部署阶段</div>
+        <div class="chip">场上 24</div>
+        <div class="chip">新增：迫击炮 / 火箭 / 电弧 / 无人机</div>
+      </div>
+      <div class="stage-legend">
+        <span><i style="background:#7ee0ff"></i>小型</span>
+        <span><i style="background:#ffb545"></i>中型</span>
+        <span><i style="background:#ff5470"></i>大型</span>
+        <span style="margin-left:auto">虚线 = 射程 / 最小射程</span>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <div class="panel-head">
+        <h2>塔详情 / 升级</h2>
+        <span class="hint" id="selHint">未选中</span>
+      </div>
+      <div class="mechanic-box" id="mechanicBox">
+        <span style="color:var(--muted)">选择左侧防御塔查看升级树与唯一机制。</span>
+      </div>
+      <div class="kv" id="statGrid"></div>
+      <div class="scroll" id="upgradeList"></div>
+    </aside>
+  </main>
+
+  <footer>
+    <h3>战斗事件</h3>
+    <div id="log">
+      <div><b>第 12 波</b> 开始 · 34 个目标</div>
+      <div class="ok">建造 迫击炮（-220 金币）</div>
+      <div class="warn">机制触发 · 空爆子母弹 ×8</div>
+      <div class="ok">升级 火箭塔 → Lv5「电浆导弹」· 机制 plasma_missile</div>
+      <div class="warn">机制触发 · 引雷针生成（3 次 / 60 秒）</div>
+      <div class="ok">编队出击 · 无人机库 10 架（mobile_factory）</div>
+    </div>
+  </footer>
+</div>
+
+<script src="data.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  const D = window.GAME_DATA;
+  const TOWERS = D.towers;
+  const UPGRADES = D.upgrades;
+
+  const NAMES = {
+    machine_gun: '机枪塔', laser: '激光塔', mortar: '迫击炮',
+    rocket: '火箭塔', tesla: '电弧塔', drone_hangar: '无人机库'
+  };
+  const ROLES = {
+    machine_gun: '单体压制 · 弹匣换弹', laser: '长射程光束 · 留存贯穿',
+    mortar: '曲射范围 · 最小射程 10', rocket: '追踪齐射 · 爆发',
+    tesla: '连锁电场 · 异常状态', drone_hangar: '编队部署 · 雷达引导'
+  };
+  const ART = {
+    machine_gun: '../../Assets/Art/Towers/preview_machine_gun.jpg',
+    laser: '../../Assets/Art/Towers/preview_laser.jpg',
+    mortar: '../../Assets/Art/Towers/preview_mortar.jpg',
+    rocket: artUrl('Tower defense tower icon: multiple rocket launcher pod, four missile tubes, orange warning stripes, hexagonal armored base, dark navy background'),
+    tesla: artUrl('Tower defense tower icon: tesla coil lightning tower, copper rings, blue electric arcs, hexagonal metal base, dark navy background'),
+    drone_hangar: artUrl('Tower defense tower icon: drone hangar with landing pad and three small quadcopter drones, hexagonal armored base, dark navy background')
+  };
+  const MISSING = { rocket: true, tesla: true, drone_hangar: true };
+
+  const MECH = {
+    cluster: '空爆子母弹：落点抛撒 8 枚子弹，黄金角铺开覆盖整片区域。',
+    fragmentation: '高爆破片：中心高穿甲，外圈低穿甲大范围二次破片。',
+    napalm: '凝固汽油弹：爆炸后留下燃烧区域，持续叠燃烧层数。',
+    cryo: '液氮弹：爆炸后留下低温区域，降低敌人阻滞阈值。',
+    array_battery: '阵列炮：三管齐射，同帧覆盖三个目标。',
+    smart_implosion: '智能内爆：单段 161% 高穿甲，命中后附加碎甲。',
+    swarm: '蜂群弹幕：单次抛撒 8 枚小当量火箭。',
+    split_warhead: '分导弹头：齐射 4 发，每发再分裂 3 个子弹头。',
+    plasma_missile: '电浆导弹：元素爆炸并施加 2 层充电。',
+    thermobaric: '热压弹：大半径爆炸，并留下燃烧区域。',
+    hydrogen: '氢弹：15 半径核心 + 60 半径辐射冲击波。',
+    capacitor: '电容过载：无可跳目标时引爆，按剩余连锁次数放大单体伤害。',
+    rod: '引雷针：落点生成避雷针，吸引后续连锁并延长链长。',
+    ball_lightning: '球形闪电：爆炸半径随连锁次数增长，并施加充电。',
+    rolling_thunder: '雷电滚滚：命中后沿最近目标滚动，每跳都造成范围伤害。',
+    leak_current: '漏电：弹体驻留 3 秒，周期对范围内多个目标放电。',
+    mobile_factory: '移动工厂：雷达内自动拟合敌群重心，缩短出击距离。',
+    hurricane: '飓风炮艇：单架重装编队，双管机炮 + 8 发火箭。',
+    thunderstorm: '雷暴空袭：矩形覆盖巡航，按距离间隔投弹。',
+    refined_hangar: '精装修机库：15 架编队，弹药耗尽后快速补充。'
+  };
+
+  const STAT_NAMES = {
+    Damage: '伤害', FireRate: '射速', Range: '射程', Ammo: '弹匣', ReloadTime: '装填',
+    Retention: '留存', ExplosionRadius: '爆炸半径', BeamWidth: '束宽', BeamCount: '束数',
+    Salvo: '齐射', ChainCount: '连锁次数', ChainRange: '连锁距离', ChainFalloff: '衰减',
+    SubCount: '子弹数', SubDamage: '子弹伤害', SubRadius: '子弹半径', SpreadRadius: '散布',
+    FirstStageDamage: '一段伤害', SecondStageDamage: '二段伤害', SecondStageRadius: '二段半径',
+    ZoneScale: '区域倍率', ChargeStacks: '充电层数', AuraRadius: '光环半径',
+    AuraInterval: '光环间隔', ProjectileLifetime: '弹体寿命', ProjectileSpeed: '弹速',
+    DroneSquad: '编队规模', DroneCapacity: '机库容量', DroneReload: '补充时间',
+    DroneDeployInterval: '出击间隔', DroneAmmo: '编队弹药', DroneFireRate: '编队射速',
+    DroneDamage: '编队伤害', DroneRange: '编队射程', DroneSpeed: '编队速度',
+    DroneSelfDestructRadius: '自毁半径', DroneSelfDestructDamage: '自毁伤害',
+    RadarRange: '雷达范围', BlockForce: '阻滞力', MinRange: '最小射程'
+  };
+
+  let selectedTower = 'mortar';
+  let selectedNode = null;
+
+  function artUrl(prompt) {
+    return 'https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=' +
+      encodeURIComponent(prompt) + '&image_size=square_hd';
+  }
+
+  function towerName(id) { return NAMES[id] || id; }
+
+  function baseStats(def) {
+    return {
+      damage: def.damage, fireRate: def.fireRate, range: def.range,
+      minRange: def.minRange || (def.id === 'mortar' ? 10 : 0),
+      ammo: def.ammo || 0, pierce: def.pierce || 'Mid'
+    };
+  }
+
+  function dps(def) {
+    if (def.droneCapacity > 0) return def.droneDamage * def.droneFireRate * Math.max(1, def.droneSquad);
+    return def.damage * def.fireRate * (def.salvo || 1);
+  }
+
+  function nodesOf(towerId) {
+    return UPGRADES.filter(n => n.towerId === towerId).sort((a, b) => a.level - b.level);
+  }
+
+  function cost(def, node) {
+    const steps = node.level - 1;
+    let c = def.price * node.costFactor * steps * steps;
+    if (node.unique) c *= 1.25;
+    return Math.round(c);
+  }
+
+  function modText(mod) {
+    const name = STAT_NAMES[mod.key] || mod.key;
+    if (mod.op === 'Set') return name + ' = ' + mod.value;
+    if (mod.op === 'Add') return name + ' +' + mod.value;
+    if (mod.value >= 1) return name + ' +' + Math.round((mod.value - 1) * 100) + '%';
+    return name + ' -' + Math.round((1 - mod.value) * 100) + '%';
+  }
+
+  function nodeLabel(node) {
+    return node.id.split('_').slice(2).join(' ');
+  }
+
+  function renderBuildList() {
+    const host = document.getElementById('buildList');
+    host.innerHTML = '';
+    TOWERS.forEach(def => {
+      const el = document.createElement('div');
+      el.className = 'card' + (selectedTower === def.id ? ' active' : '');
+      el.innerHTML =
+        '<div class="thumb" style="background-image:url(\'' + ART[def.id] + '\')"></div>' +
+        '<div class="body">' +
+          '<div class="title"><b>' + towerName(def.id) + '</b><span class="price">' + def.price + 'g</span></div>' +
+          '<div class="desc">' + ROLES[def.id] + '</div>' +
+          '<div class="tags"><span class="tag">DPS ' + dps(def).toFixed(1) + '</span>' +
+          '<span class="tag">射程 ' + def.range + '</span>' +
+          '<span class="tag ' + pierceClass(def.pierce) + '">' + pierceName(def.pierce) + '</span></div>' +
+        '</div>' +
+        (MISSING[def.id] ? '<span class="badge-missing">美术待补</span>' : '');
+      el.addEventListener('click', () => {
+        selectedTower = def.id;
+        selectedNode = null;
+        renderBuildList();
+        renderDetail();
+      });
+      host.appendChild(el);
+    });
+  }
+
+  function pierceName(p) { return { Low: '低穿甲', Mid: '中穿甲', High: '高穿甲' }[p] || '中穿甲'; }
+  function pierceClass(p) { return p === 'High' ? 'green' : (p === 'Mid' ? 'cyan' : ''); }
+
+  function renderDetail() {
+    const def = TOWERS.find(t => t.id === selectedTower);
+    if (!def) return;
+
+    const stats = baseStats(def);
+    document.getElementById('selHint').textContent = towerName(def.id);
+    document.getElementById('statGrid').innerHTML = [
+      ['定位', ROLES[def.id].split(' · ')[0]],
+      ['基础 DPS', dps(def).toFixed(1)],
+      ['射程', stats.range + (stats.minRange ? '（最小 ' + stats.minRange + '）' : '')],
+      ['穿甲', pierceName(stats.pierce)],
+      ['弹匣', stats.ammo > 0 ? stats.ammo : '无限'],
+      ['升级数', nodesOf(def.id).length + ' 节点']
+    ].map(r => '<div>' + r[0] + '<span>' + r[1] + '</span></div>').join('');
+
+    const nodes = nodesOf(def.id);
+    const uniqueNodes = nodes.filter(n => n.mechanic);
+    const mechBox = document.getElementById('mechanicBox');
+    if (uniqueNodes.length === 0) {
+      mechBox.innerHTML = '<span style="color:var(--muted)">该塔暂无机制升级。</span>';
+    } else {
+      mechBox.innerHTML = '<b>机制线 · ' + uniqueNodes.map(n => 'Lv' + n.level).join(' / ') + '</b><br>' +
+        uniqueNodes.map(n => '· ' + (MECH[n.mechanic] || n.mechanic)).join('<br>');
+    }
+
+    const list = document.getElementById('upgradeList');
+    list.innerHTML = '';
+    nodes.forEach(node => {
+      const el = document.createElement('div');
+      el.className = 'node' + (node.unique ? ' unique' : '') + (selectedNode === node.id ? ' sel' : '');
+      el.innerHTML =
+        '<div class="row"><span class="name">' + nodeLabel(node) +
+          (node.unique ? ' <span class="tag amber">唯一</span>' : '') +
+        '</span><span class="lv">Lv' + node.level + '</span></div>' +
+        (node.mechanic ? '<div class="mech">机制 · ' + node.mechanic + '</div>' : '') +
+        '<div class="mods">' + (node.modifiers || []).map(modText).join(' · ') + '</div>' +
+        '<div class="row"><span class="cost">' + cost(def, node) + ' 金币</span>' +
+        '<button>查看</button></div>';
+
+      el.querySelector('button').addEventListener('click', () => {
+        selectedNode = node.id;
+        renderDetail();
+      });
+      list.appendChild(el);
+    });
+  }
+
+  renderBuildList();
+  renderDetail();
+})();
+</script>
+</body>
+</html>

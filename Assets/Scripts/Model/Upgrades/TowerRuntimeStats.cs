@@ -24,6 +24,43 @@ namespace Game.Model
         public DeliveryKind Delivery;
         public DamageType DamageType;
 
+        /// <summary>唯一升级机制标签;空 = 无特殊机制。</summary>
+        public string Mechanic = string.Empty;
+
+        public float MinRange;
+        public float ProjectileSpeed;
+        public bool HomingProjectile;
+        public int Salvo = 1;
+        public bool NoTurn;
+        public int ChainCount;
+        public float ChainRange;
+        public float ChainFalloff;
+        public int SubCount;
+        public float SubDamage = 1f;
+        public float SubRadius;
+        public float SpreadRadius;
+        public float FirstStageDamage = 1f;
+        public float SecondStageDamage = 1f;
+        public float SecondStageRadius = 1f;
+        public float ZoneScale = 1f;
+        public int ChargeStacks;
+        public float AuraRadius;
+        public float AuraInterval;
+        public float ProjectileLifetime;
+
+        public int DroneSquad;
+        public int DroneCapacity;
+        public float DroneReload;
+        public float DroneDeployInterval;
+        public float DroneAmmo;
+        public float DroneFireRate;
+        public float DroneDamage;
+        public float DroneRange;
+        public float DroneSpeed;
+        public float DroneSelfDestructRadius;
+        public float DroneSelfDestructDamage;
+        public float RadarRange;
+
         public static TowerRuntimeStats FromDef(TowerDef def)
         {
             return new TowerRuntimeStats
@@ -44,7 +81,40 @@ namespace Game.Model
                 Pierce = def.Pierce,
                 Strategy = def.Strategy,
                 Delivery = def.Delivery,
-                DamageType = def.Delivery == DeliveryKind.HitscanRect ? DamageType.Energy : DamageType.Ballistic
+                DamageType = def.DamageType,
+                Mechanic = string.Empty,
+                MinRange = def.MinRange,
+                ProjectileSpeed = def.ProjectileSpeed,
+                HomingProjectile = def.HomingProjectile,
+                Salvo = def.Salvo <= 0 ? 1 : def.Salvo,
+                NoTurn = def.NoTurn,
+                ChainCount = def.ChainCount,
+                ChainRange = def.ChainRange,
+                ChainFalloff = def.ChainFalloff,
+                SubCount = def.SubCount,
+                SubDamage = def.SubDamage <= 0f ? 1f : def.SubDamage,
+                SubRadius = def.SubRadius,
+                SpreadRadius = def.SpreadRadius,
+                FirstStageDamage = def.FirstStageDamage <= 0f ? 1f : def.FirstStageDamage,
+                SecondStageDamage = def.SecondStageDamage <= 0f ? 1f : def.SecondStageDamage,
+                SecondStageRadius = def.SecondStageRadius <= 0f ? 1f : def.SecondStageRadius,
+                ZoneScale = def.ZoneScale <= 0f ? 1f : def.ZoneScale,
+                ChargeStacks = def.ChargeStacks,
+                AuraRadius = def.AuraRadius,
+                AuraInterval = def.AuraInterval,
+                ProjectileLifetime = def.ProjectileLifetime,
+                DroneSquad = def.DroneSquad,
+                DroneCapacity = def.DroneCapacity,
+                DroneReload = def.DroneReload,
+                DroneDeployInterval = def.DroneDeployInterval,
+                DroneAmmo = def.DroneAmmo,
+                DroneFireRate = def.DroneFireRate,
+                DroneDamage = def.DroneDamage,
+                DroneRange = def.DroneRange,
+                DroneSpeed = def.DroneSpeed,
+                DroneSelfDestructRadius = def.DroneSelfDestructRadius,
+                DroneSelfDestructDamage = def.DroneSelfDestructDamage,
+                RadarRange = def.RadarRange
             };
         }
     }

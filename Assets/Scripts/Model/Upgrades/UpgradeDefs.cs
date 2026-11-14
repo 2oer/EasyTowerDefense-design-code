@@ -18,7 +18,38 @@ namespace Game.Model
         ExplosionRadius = 10,
 
         /// <summary>激光束数量;默认 1。</summary>
-        BeamCount = 11
+        BeamCount = 11,
+
+        MinRange = 12,
+        ProjectileSpeed = 13,
+        Salvo = 14,
+        ChainCount = 15,
+        ChainRange = 16,
+        ChainFalloff = 17,
+        SubCount = 18,
+        SubDamage = 19,
+        SubRadius = 20,
+        SpreadRadius = 21,
+        FirstStageDamage = 22,
+        SecondStageDamage = 23,
+        SecondStageRadius = 24,
+        ZoneScale = 25,
+        DroneSquad = 26,
+        DroneCapacity = 27,
+        DroneReload = 28,
+        DroneDeployInterval = 29,
+        DroneAmmo = 30,
+        DroneFireRate = 31,
+        DroneDamage = 32,
+        DroneRange = 33,
+        DroneSpeed = 34,
+        DroneSelfDestructRadius = 35,
+        DroneSelfDestructDamage = 36,
+        RadarRange = 37,
+        ChargeStacks = 38,
+        AuraRadius = 39,
+        AuraInterval = 40,
+        ProjectileLifetime = 41
     }
 
     public enum ModifierOp
@@ -70,5 +101,8 @@ namespace Game.Model
 
         /// <summary>转为持续照射型(聚焦 / 扫荡透镜):按弹容与重装折算等效射速。</summary>
         public bool Continuous { get; set; }
+
+        /// <summary>唯一升级机制标签(napalm / cluster / array / smart_implosion 等)。空 = 无。</summary>
+        public string Mechanic { get; set; } = string.Empty;
     }
 }

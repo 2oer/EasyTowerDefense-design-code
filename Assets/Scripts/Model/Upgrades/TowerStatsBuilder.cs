@@ -34,6 +34,7 @@ namespace Game.Model
             if (node.Pierce.HasValue) stats.Pierce = node.Pierce.Value;
             if (node.Strategy.HasValue) stats.Strategy = node.Strategy.Value;
             if (node.Continuous) stats.Continuous = true;
+            if (!string.IsNullOrEmpty(node.Mechanic)) stats.Mechanic = node.Mechanic;
         }
 
         /// <summary>
@@ -89,6 +90,96 @@ namespace Game.Model
                     break;
                 case StatKey.BeamCount:
                     stats.BeamCount = mod.Op == ModifierOp.Set ? (int)mod.Value : (int)Combine(stats.BeamCount, mod);
+                    break;
+                case StatKey.MinRange:
+                    stats.MinRange = Combine(stats.MinRange, mod);
+                    break;
+                case StatKey.ProjectileSpeed:
+                    stats.ProjectileSpeed = Combine(stats.ProjectileSpeed, mod);
+                    break;
+                case StatKey.Salvo:
+                    stats.Salvo = mod.Op == ModifierOp.Set ? (int)mod.Value : (int)Combine(stats.Salvo, mod);
+                    break;
+                case StatKey.ChainCount:
+                    stats.ChainCount = mod.Op == ModifierOp.Set ? (int)mod.Value : (int)Combine(stats.ChainCount, mod);
+                    break;
+                case StatKey.ChainRange:
+                    stats.ChainRange = Combine(stats.ChainRange, mod);
+                    break;
+                case StatKey.ChainFalloff:
+                    stats.ChainFalloff = Combine(stats.ChainFalloff, mod);
+                    break;
+                case StatKey.SubCount:
+                    stats.SubCount = mod.Op == ModifierOp.Set ? (int)mod.Value : (int)Combine(stats.SubCount, mod);
+                    break;
+                case StatKey.SubDamage:
+                    stats.SubDamage = Combine(stats.SubDamage, mod);
+                    break;
+                case StatKey.SubRadius:
+                    stats.SubRadius = Combine(stats.SubRadius, mod);
+                    break;
+                case StatKey.SpreadRadius:
+                    stats.SpreadRadius = Combine(stats.SpreadRadius, mod);
+                    break;
+                case StatKey.FirstStageDamage:
+                    stats.FirstStageDamage = Combine(stats.FirstStageDamage, mod);
+                    break;
+                case StatKey.SecondStageDamage:
+                    stats.SecondStageDamage = Combine(stats.SecondStageDamage, mod);
+                    break;
+                case StatKey.SecondStageRadius:
+                    stats.SecondStageRadius = Combine(stats.SecondStageRadius, mod);
+                    break;
+                case StatKey.ZoneScale:
+                    stats.ZoneScale = Combine(stats.ZoneScale, mod);
+                    break;
+                case StatKey.DroneSquad:
+                    stats.DroneSquad = mod.Op == ModifierOp.Set ? (int)mod.Value : (int)Combine(stats.DroneSquad, mod);
+                    break;
+                case StatKey.DroneCapacity:
+                    stats.DroneCapacity = mod.Op == ModifierOp.Set ? (int)mod.Value : (int)Combine(stats.DroneCapacity, mod);
+                    break;
+                case StatKey.DroneReload:
+                    stats.DroneReload = Combine(stats.DroneReload, mod);
+                    break;
+                case StatKey.DroneDeployInterval:
+                    stats.DroneDeployInterval = Combine(stats.DroneDeployInterval, mod);
+                    break;
+                case StatKey.DroneAmmo:
+                    stats.DroneAmmo = Combine(stats.DroneAmmo, mod);
+                    break;
+                case StatKey.DroneFireRate:
+                    stats.DroneFireRate = Combine(stats.DroneFireRate, mod);
+                    break;
+                case StatKey.DroneDamage:
+                    stats.DroneDamage = Combine(stats.DroneDamage, mod);
+                    break;
+                case StatKey.DroneRange:
+                    stats.DroneRange = Combine(stats.DroneRange, mod);
+                    break;
+                case StatKey.DroneSpeed:
+                    stats.DroneSpeed = Combine(stats.DroneSpeed, mod);
+                    break;
+                case StatKey.DroneSelfDestructRadius:
+                    stats.DroneSelfDestructRadius = Combine(stats.DroneSelfDestructRadius, mod);
+                    break;
+                case StatKey.DroneSelfDestructDamage:
+                    stats.DroneSelfDestructDamage = Combine(stats.DroneSelfDestructDamage, mod);
+                    break;
+                case StatKey.RadarRange:
+                    stats.RadarRange = Combine(stats.RadarRange, mod);
+                    break;
+                case StatKey.ChargeStacks:
+                    stats.ChargeStacks = mod.Op == ModifierOp.Set ? (int)mod.Value : (int)Combine(stats.ChargeStacks, mod);
+                    break;
+                case StatKey.AuraRadius:
+                    stats.AuraRadius = Combine(stats.AuraRadius, mod);
+                    break;
+                case StatKey.AuraInterval:
+                    stats.AuraInterval = Combine(stats.AuraInterval, mod);
+                    break;
+                case StatKey.ProjectileLifetime:
+                    stats.ProjectileLifetime = Combine(stats.ProjectileLifetime, mod);
                     break;
             }
         }

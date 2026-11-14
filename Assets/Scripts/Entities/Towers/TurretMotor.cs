@@ -16,6 +16,12 @@ namespace Game.Entity
             AimAngle = radians;
         }
 
+        /// <summary>无需转向的塔(迫击炮 / 无人机库)直接对齐目标。</summary>
+        public void SnapTo(float radians)
+        {
+            AimAngle = MathUtil.NormalizeAngle(radians);
+        }
+
         /// <summary>朝目标最大速度转动一帧,返回是否已进入容差。</summary>
         public bool TurnTowards(float desiredRadians, float turnSpeedPoints, float toleranceRad, float dt)
         {

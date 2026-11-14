@@ -13,11 +13,23 @@ namespace Game.Model
         public List<UpgradeNodeDef> Upgrades { get; } = new List<UpgradeNodeDef>();
         public WaveRules Waves { get; set; } = new WaveRules();
 
+        /// <summary>特殊效果 / 区域效果数值(异常状态与范围伤害共用)。</summary>
+        public StatusRules Effects { get; set; } = new StatusRules();
+
         public TowerDef? FindTower(string id)
         {
             for (int i = 0; i < Towers.Count; i++)
             {
                 if (string.Equals(Towers[i].Id, id, StringComparison.Ordinal)) return Towers[i];
+            }
+            return null;
+        }
+
+        public EnemyDef? FindEnemy(string id)
+        {
+            for (int i = 0; i < Enemies.Count; i++)
+            {
+                if (string.Equals(Enemies[i].Id, id, StringComparison.Ordinal)) return Enemies[i];
             }
             return null;
         }

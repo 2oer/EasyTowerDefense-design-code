@@ -29,6 +29,7 @@ namespace SimHarness
             db.Maps.AddRange(Read<List<MapDef>>(Path.Combine(directory, "maps.json"), options));
             db.Upgrades.AddRange(Read<List<UpgradeNodeDef>>(Path.Combine(directory, "upgrades.json"), options));
             db.Waves = Read<WaveRules>(Path.Combine(directory, "waves.json"), options);
+            db.Effects = Read<StatusRules>(Path.Combine(directory, "effects.json"), options);
             return db;
         }
 

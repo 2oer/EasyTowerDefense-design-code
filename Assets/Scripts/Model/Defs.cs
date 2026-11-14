@@ -19,6 +19,67 @@ namespace Game.Model
         public TowerStrategy Strategy { get; set; }
         public DeliveryKind Delivery { get; set; }
         public float BulletRadius { get; set; } = 0.25f;
+
+        // ---- 通用战斗扩展 --------------------------------------------------------
+        public DamageType DamageType { get; set; } = DamageType.Ballistic;
+
+        /// <summary>最小射程;0 表示无限制。</summary>
+        public float MinRange { get; set; }
+
+        /// <summary>弹丸飞行速度;0 表示即时命中。</summary>
+        public float ProjectileSpeed { get; set; }
+
+        /// <summary>弹丸是否追踪目标(火箭);false = 抛射到预判落点(迫击炮)。</summary>
+        public bool HomingProjectile { get; set; }
+
+        /// <summary>每轮齐射发数(阵列炮 / 火箭齐射)。</summary>
+        public int Salvo { get; set; } = 1;
+
+        /// <summary>无需转向(迫击炮 / 无人机库)。</summary>
+        public bool NoTurn { get; set; }
+
+        // ---- 电弧 -----------------------------------------------------------------
+        public int ChainCount { get; set; }
+        public float ChainRange { get; set; }
+        public float ChainFalloff { get; set; }
+
+        // ---- 空爆子母弹 -----------------------------------------------------------
+        public int SubCount { get; set; }
+        public float SubDamage { get; set; } = 1f;
+        public float SubRadius { get; set; }
+        public float SpreadRadius { get; set; }
+
+        // ---- 高爆破片弹 -----------------------------------------------------------
+        public float FirstStageDamage { get; set; } = 1f;
+        public float SecondStageDamage { get; set; } = 1f;
+        public float SecondStageRadius { get; set; } = 1f;
+
+        // ---- 属性区域(凝固汽油弹 / 液氮弹 / 热压弹) ---------------------------
+        public float ZoneScale { get; set; } = 1f;
+
+        /// <summary>命中施加的充电层数(电浆导弹 / 球形闪电 / 漏电)。</summary>
+        public int ChargeStacks { get; set; }
+
+        /// <summary>飞行途中周期放电半径 / 间隔(漏电)。</summary>
+        public float AuraRadius { get; set; }
+        public float AuraInterval { get; set; }
+
+        /// <summary>投掷物最长寿命;0 = 不限(漏电)。</summary>
+        public float ProjectileLifetime { get; set; }
+
+        // ---- 无人机库 -------------------------------------------------------------
+        public int DroneSquad { get; set; }
+        public int DroneCapacity { get; set; }
+        public float DroneReload { get; set; }
+        public float DroneDeployInterval { get; set; }
+        public float DroneAmmo { get; set; }
+        public float DroneFireRate { get; set; }
+        public float DroneDamage { get; set; }
+        public float DroneRange { get; set; }
+        public float DroneSpeed { get; set; }
+        public float DroneSelfDestructRadius { get; set; }
+        public float DroneSelfDestructDamage { get; set; }
+        public float RadarRange { get; set; }
     }
 
     /// <summary>敌人定义。数量与波次节奏不在这里。</summary>
