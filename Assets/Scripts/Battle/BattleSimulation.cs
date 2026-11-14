@@ -29,16 +29,37 @@ namespace Game.Battle
             "laser", "machine_gun", "machine_gun", "laser"
         };
 
-        /// <summary>机枪塔升级路线:快速供弹 → 高速枪机 → 电磁反器材。</summary>
+        /// <summary>机枪塔路线:快速供弹 → 高速枪机 → 电磁反器材 → 重型弹芯 → 快速充能 → 低温超导钢芯。</summary>
         private static readonly string[] MgUpgradePath =
         {
-            "mg_lv2_quick_feed", "mg_lv3_high_speed_bolt", "mg_lv4_antimateriel"
+            "mg_lv2_quick_feed", "mg_lv3_high_speed_bolt", "mg_lv4_antimateriel",
+            "mg_lv5_heavy_core", "mg_lv6_fast_charge", "mg_lv7_cryo_core"
         };
+
+        /// <summary>激光聚焦路线:高效冷却 → 稳压回路 → 聚焦透镜 → 高压泵浦 → 散热矩阵 → 热熔。</summary>
+        private static readonly string[] LaserFocusPath =
+        {
+            "laser_lv2_efficient_cool", "laser_lv3_stable_circuit", "laser_lv4_focus_lens",
+            "laser_lv5_high_pressure", "laser_lv6_heat_matrix", "laser_lv7_thermal_melt"
+        };
+
+        /// <summary>激光扫荡路线:高效冷却 → 稳压回路 → 扫荡透镜 → 分光棱镜组 → 轮转打击 → 散射棱镜。</summary>
+        private static readonly string[] LaserSweepPath =
+        {
+            "laser_lv2_efficient_cool", "laser_lv3_stable_circuit", "laser_lv4_sweep_lens",
+            "laser_lv5_split_prism", "laser_lv6_rotate_strike", "laser_lv7_scatter_prism"
+        };
+
+        private readonly string[] _laserPath;
 
         private int _builtCount;
 
-        public BattleSimulation(ModelDatabase db, string difficultyId, string mapId, ulong seed, float baseMaxHpOverride = 0f)
+        public BattleSimulation(ModelDatabase db, string difficultyId, string mapId, ulong seed,
+            float baseMaxHpOverride = 0f, string laserBranch = "focus")
         {
+            _laserPath = string.Equals(laserBranch, "sweep", StringComparison.OrdinalIgnoreCase)
+                ? LaserSweepPath
+                : LaserFocusPath;
             if (db == null) throw new ArgumentNullException(nameof(db));
 
             DifficultyDef difficulty = db.FindDifficulty(difficultyId)
@@ -244,19 +265,61 @@ namespace Game.Battle
             }
         }
 
+        /// <summary>
+        /// 严格优先级:先把第一座机枪送到 Lv4(电磁反器材),再第二座机枪,再激光到 Lv4,最后才买 Lv5+。
+        /// 高优先级节点买不起时选择攒钱,而不是降级消费。
+        /// </summary>
         private void TryUpgrade()
         {
+            int primaryMg = -1;
             for (int i = 0; i < _world.Towers.Count; i++)
             {
-                TowerAgent tower = _world.Towers[i];
-                if (tower.Def.Id != "machine_gun") continue;
-
-                for (int p = tower.Upgrades.Count; p < MgUpgradePath.Length; p++)
+                if (_world.Towers[i].Def.Id == "machine_gun")
                 {
-                    if (!_upgrades.TryApply(tower, MgUpgradePath[p], out int cost)) break;
-                    OnUpgrade?.Invoke(tower.Id.Index, MgUpgradePath[p], cost);
+                    primaryMg = _world.Towers[i].Id.Index;
+                    break;
                 }
             }
+
+            for (int guard = 0; guard < 48; guard++)
+            {
+                TowerAgent? bestTower = null;
+                string? bestNodeId = null;
+                int bestKey = int.MaxValue;
+
+                for (int i = 0; i < _world.Towers.Count; i++)
+                {
+                    TowerAgent tower = _world.Towers[i];
+                    string[] path = tower.Def.Id == "machine_gun" ? MgUpgradePath : _laserPath;
+                    if (tower.Upgrades.Count >= path.Length) continue;
+
+                    int phase = UpgradePhase(tower, primaryMg);
+                    int key = phase * 1000 + tower.Id.Index;
+                    if (key < bestKey)
+                    {
+                        bestKey = key;
+                        bestTower = tower;
+                        bestNodeId = path[tower.Upgrades.Count];
+                    }
+                }
+
+                if (bestTower == null || bestNodeId == null) return;
+
+                UpgradeNodeDef? node = _db.FindUpgrade(bestNodeId);
+                if (node == null) return;
+
+                if (_economy.Gold < _upgrades.Cost(bestTower.Def, node)) return;
+
+                if (!_upgrades.TryApply(bestTower, bestNodeId, out int cost)) return;
+                OnUpgrade?.Invoke(bestTower.Id.Index, bestNodeId, cost);
+            }
+        }
+
+        private static int UpgradePhase(TowerAgent tower, int primaryMg)
+        {
+            if (tower.Level >= 4) return 3;
+            if (tower.Def.Id == "machine_gun") return tower.Id.Index == primaryMg ? 0 : 1;
+            return 2;
         }
 
         private float HpScale(int wave)

@@ -177,6 +177,9 @@ namespace Game.Entity
         private float HalfWidth() =>
             Stats.Delivery == DeliveryKind.HitscanRect ? Stats.BeamWidth * 0.5f : Stats.BulletRadius;
 
+        /// <summary>多束激光的相邻束夹角(扫荡透镜的扇形近似)。</summary>
+        private const float BeamSpreadRad = 0.1047f;
+
         private void Fire(IReadOnlyList<EnemyRuntime> enemies, List<EnemyRuntime> hitBuffer)
         {
             Cooldown = 1f / Stats.FireRate;
@@ -191,10 +194,24 @@ namespace Game.Entity
                 }
             }
 
-            float angle = Motor.AimAngle;
-            var direction = new Vec2((float)Math.Cos(angle), (float)Math.Sin(angle));
-            HitscanResolver.Query(Position, direction, Stats.Range, HalfWidth(), enemies, hitBuffer);
+            int beams = Math.Max(1, Stats.BeamCount);
+            float baseAngle = Motor.AimAngle;
+            int totalHits = 0;
 
+            for (int b = 0; b < beams; b++)
+            {
+                float offset = beams == 1 ? 0f : (b - (beams - 1) * 0.5f) * BeamSpreadRad;
+                float angle = baseAngle + offset;
+                var direction = new Vec2((float)Math.Cos(angle), (float)Math.Sin(angle));
+                HitscanResolver.Query(Position, direction, Stats.Range, HalfWidth(), enemies, hitBuffer);
+                totalHits += ApplyBeam(hitBuffer);
+            }
+
+            LastHitCount = totalHits;
+        }
+
+        private int ApplyBeam(List<EnemyRuntime> hitBuffer)
+        {
             var packet = new DamagePacket
             {
                 Amount = Stats.Damage,
@@ -220,7 +237,7 @@ namespace Game.Entity
                 if (!PenetrationResolver.CanContinue(retention)) break;
             }
 
-            LastHitCount = hits;
+            return hits;
         }
     }
 }

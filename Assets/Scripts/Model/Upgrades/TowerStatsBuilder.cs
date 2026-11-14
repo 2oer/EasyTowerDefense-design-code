@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace Game.Model
@@ -15,6 +16,8 @@ namespace Game.Model
                 Apply(stats, nodes[i]);
             }
 
+            if (stats.Continuous) ApplyContinuous(stats);
+
             return stats;
         }
 
@@ -30,6 +33,21 @@ namespace Game.Model
 
             if (node.Pierce.HasValue) stats.Pierce = node.Pierce.Value;
             if (node.Strategy.HasValue) stats.Strategy = node.Strategy.Value;
+            if (node.Continuous) stats.Continuous = true;
+        }
+
+        /// <summary>
+        /// 持续照射型:照射时长 = 弹容 ÷ 射速,重装间隔固定;结算频率 ×1.5(单次伤害 ×0.75、频率 ×2)。
+        /// 折算成等效射速后,塔按普通节奏开火,不再消耗弹容。
+        /// </summary>
+        private static void ApplyContinuous(TowerRuntimeStats stats)
+        {
+            float interval = stats.ReloadTime > 0f ? stats.ReloadTime : 0.5f;
+            float duration = (stats.Ammo > 0 ? stats.Ammo : 100f) / Math.Max(0.0001f, stats.FireRate);
+            float duty = duration / (duration + interval);
+            stats.FireRate *= 1.5f * duty;
+            stats.Ammo = 1;
+            stats.ReloadTime = 0f;
         }
 
         private static void ApplyModifier(TowerRuntimeStats stats, StatModifier mod)
@@ -68,6 +86,9 @@ namespace Game.Model
                     break;
                 case StatKey.ExplosionRadius:
                     stats.ExplosionRadius = Combine(stats.ExplosionRadius, mod);
+                    break;
+                case StatKey.BeamCount:
+                    stats.BeamCount = mod.Op == ModifierOp.Set ? (int)mod.Value : (int)Combine(stats.BeamCount, mod);
                     break;
             }
         }

@@ -18,6 +18,8 @@ namespace SimHarness
         public float BaseHpOverride;
         public float WaveTimeout = 900f;
         public bool SelfTest;
+        public string LaserBranch = "focus";
+        public bool CompareDifficulties;
 
         public static CliOptions Parse(string[] args)
         {
@@ -49,6 +51,12 @@ namespace SimHarness
                         break;
                     case "--selftest":
                         options.SelfTest = true;
+                        break;
+                    case "--laser-branch":
+                        options.LaserBranch = args[++i];
+                        break;
+                    case "--compare-difficulties":
+                        options.CompareDifficulties = true;
                         break;
                     default:
                         throw new ArgumentException("未知参数:" + args[i]);
@@ -89,32 +97,72 @@ namespace SimHarness
                 return RunSelfTest(db, options) ? 0 : 3;
             }
 
-            ulong firstHash;
-            int firstWave;
-            RunOnce(db, options, 1, true, out firstHash, out firstWave);
+            if (options.CompareDifficulties)
+            {
+                return RunCompareDifficulties(db, options);
+            }
 
-            ulong secondHash;
-            int secondWave;
-            RunOnce(db, options, 2, false, out secondHash, out secondWave);
+            RunResult first = RunOnce(db, options, 1, true);
+            RunResult second = RunOnce(db, options, 2, false);
 
-            bool deterministic = firstHash == secondHash && firstWave == secondWave;
+            bool deterministic = first.Hash == second.Hash && first.Wave == second.Wave;
             Console.WriteLine(
-                "[hash] run1=0x" + firstHash.ToString("X16") +
-                " run2=0x" + secondHash.ToString("X16") +
+                "[hash] run1=0x" + first.Hash.ToString("X16") +
+                " run2=0x" + second.Hash.ToString("X16") +
                 " determinism=" + (deterministic ? "OK" : "FAIL"));
 
             return deterministic ? 0 : 4;
         }
 
-        private static void RunOnce(
+        private sealed class RunResult
+        {
+            public ulong Hash;
+            public int Wave;
+            public string StopReason = "running";
+            public long Kills;
+            public long Leaks;
+            public long Spawned;
+            public int Gold;
+            public int Meta;
+            public float BaseHp;
+            public float BaseMaxHp;
+            public float SimTime;
+            public int Tick;
+        }
+
+        private static int RunCompareDifficulties(ModelDatabase db, CliOptions options)
+        {
+            Console.WriteLine("[compare] waves=" + options.Waves + " seed=" + options.Seed +
+                              " laser=" + options.LaserBranch);
+            Console.WriteLine("difficulty | wave | kills | leaks | base% | gold | meta | state");
+            string[] order = { "easy", "normal", "hard" };
+            string original = options.Difficulty;
+            for (int i = 0; i < order.Length; i++)
+            {
+                options.Difficulty = order[i];
+                RunResult r = RunOnce(db, options, 1, false);
+                float basePct = r.BaseMaxHp > 0f ? r.BaseHp / r.BaseMaxHp * 100f : 0f;
+                Console.WriteLine(
+                    order[i] + " | " + r.Wave + "/" + options.Waves +
+                    " | " + r.Kills +
+                    " | " + r.Leaks +
+                    " | " + basePct.ToString("0.0", CultureInfo.InvariantCulture) + "%" +
+                    " | " + r.Gold +
+                    " | " + r.Meta +
+                    " | " + r.StopReason);
+            }
+            options.Difficulty = original;
+            return 0;
+        }
+
+        private static RunResult RunOnce(
             ModelDatabase db,
             CliOptions options,
             int runIndex,
-            bool verbose,
-            out ulong hash,
-            out int waveReached)
+            bool verbose)
         {
-            var sim = new BattleSimulation(db, options.Difficulty, options.MapId, options.Seed, options.BaseHpOverride);
+            var sim = new BattleSimulation(db, options.Difficulty, options.MapId, options.Seed,
+                options.BaseHpOverride, options.LaserBranch);
 
             float waveStartedAt = 0f;
             sim.OnWaveStart = wave =>
@@ -165,24 +213,39 @@ namespace SimHarness
             else if (sim.Finished) stopReason = "cleared";
             else if (ticks >= guard) stopReason = "tick_guard";
 
-            waveReached = sim.Wave;
-            hash = sim.ComputeStateHash();
+            var result = new RunResult
+            {
+                Wave = sim.Wave,
+                Hash = sim.ComputeStateHash(),
+                StopReason = stopReason,
+                Kills = sim.Kills,
+                Leaks = sim.Leaks,
+                Spawned = sim.Spawned,
+                Gold = sim.Gold,
+                Meta = sim.Meta,
+                BaseHp = sim.BaseHp,
+                BaseMaxHp = sim.BaseMaxHp,
+                SimTime = sim.Time,
+                Tick = sim.Tick
+            };
 
             if (verbose)
             {
                 Console.WriteLine(
                     "[result] run=" + runIndex +
-                    " wave=" + waveReached + "/" + options.Waves +
-                    " base=" + sim.BaseHp.ToString("0.0", CultureInfo.InvariantCulture) + "/" + sim.BaseMaxHp.ToString("0", CultureInfo.InvariantCulture) +
-                    " gold=" + sim.Gold +
-                    " meta=" + sim.Meta +
-                    " kills=" + sim.Kills +
-                    " leaks=" + sim.Leaks +
-                    " spawned=" + sim.Spawned +
-                    " ticks=" + sim.Tick +
-                    " simTime=" + sim.Time.ToString("0.0", CultureInfo.InvariantCulture) + "s" +
-                    " state=" + stopReason);
+                    " wave=" + result.Wave + "/" + options.Waves +
+                    " base=" + result.BaseHp.ToString("0.0", CultureInfo.InvariantCulture) + "/" + result.BaseMaxHp.ToString("0", CultureInfo.InvariantCulture) +
+                    " gold=" + result.Gold +
+                    " meta=" + result.Meta +
+                    " kills=" + result.Kills +
+                    " leaks=" + result.Leaks +
+                    " spawned=" + result.Spawned +
+                    " ticks=" + result.Tick +
+                    " simTime=" + result.SimTime.ToString("0.0", CultureInfo.InvariantCulture) + "s" +
+                    " state=" + result.StopReason);
             }
+
+            return result;
         }
 
         private static bool RunSelfTest(ModelDatabase db, CliOptions options)
@@ -253,6 +316,33 @@ namespace SimHarness
                     CostOf(mg!, lv2!) + CostOf(mg!, lv3!) + CostOf(mg!, lv4!), 1625f);
             }
 
+            Console.WriteLine("[selftest] 升级节点总数 = " + db.Upgrades.Count);
+            ok &= Check("机枪 / 激光升级节点共 48 个", db.Upgrades.Count, 48f);
+
+            UpgradeNodeDef? laser2 = db.FindUpgrade("laser_lv2_efficient_cool");
+            UpgradeNodeDef? laser3 = db.FindUpgrade("laser_lv3_stable_circuit");
+            UpgradeNodeDef? laser4Focus = db.FindUpgrade("laser_lv4_focus_lens");
+            UpgradeNodeDef? laser4Sweep = db.FindUpgrade("laser_lv4_sweep_lens");
+
+            if (laser != null && laser2 != null && laser3 != null && laser4Focus != null && laser4Sweep != null)
+            {
+                TowerRuntimeStats lv3Stats = TowerStatsBuilder.Build(laser,
+                    new List<UpgradeNodeDef> { laser2, laser3 });
+                ok &= Check("激光 Lv3 单体 DPS ≈ 205.3", lv3Stats.Damage * lv3Stats.FireRate, 205.3f, 0.2f);
+
+                TowerRuntimeStats focus = TowerStatsBuilder.Build(laser,
+                    new List<UpgradeNodeDef> { laser2, laser3, laser4Focus });
+                ok &= Check("聚焦透镜 单体 DPS ≈ 291", focus.Damage * focus.FireRate, 291f, 0.5f);
+                ok &= Check("聚焦透镜 束宽 2.0", focus.BeamWidth, 2f);
+                ok &= Check("聚焦透镜 留存 9", focus.Retention, 9f);
+                ok &= Check("聚焦透镜 中级穿甲", focus.Pierce == ArmorPierce.Mid ? 1f : 0f, 1f);
+
+                TowerRuntimeStats sweep = TowerStatsBuilder.Build(laser,
+                    new List<UpgradeNodeDef> { laser2, laser3, laser4Sweep });
+                ok &= Check("扫荡透镜 3 束", sweep.BeamCount, 3f);
+                ok &= Check("扫荡透镜 单束伤害 = Lv3 × 0.5", sweep.Damage, lv3Stats.Damage * 0.5f, 1e-3f);
+            }
+
             Console.WriteLine("[selftest] " + (ok ? "PASS" : "FAIL") + " seed=" + options.Seed);
             return ok;
         }
@@ -278,9 +368,9 @@ namespace SimHarness
             return hits;
         }
 
-        private static bool Check(string name, float actual, float expected)
+        private static bool Check(string name, float actual, float expected, float tolerance = 1e-4f)
         {
-            bool ok = Math.Abs(actual - expected) < 1e-4f;
+            bool ok = Math.Abs(actual - expected) < tolerance;
             Console.WriteLine("[check] " + (ok ? "OK  " : "FAIL") + " " + name +
                               " (actual=" + actual.ToString("0.###", CultureInfo.InvariantCulture) + ")");
             return ok;

@@ -17,6 +17,8 @@ namespace Game.Model
         public float BeamWidth;
         public float BulletRadius;
         public float ExplosionRadius;
+        public int BeamCount = 1;
+        public bool Continuous;
         public ArmorPierce Pierce;
         public TowerStrategy Strategy;
         public DeliveryKind Delivery;
@@ -37,6 +39,8 @@ namespace Game.Model
                 BeamWidth = def.BeamWidth,
                 BulletRadius = def.BulletRadius,
                 ExplosionRadius = def.ExplosionRadius,
+                BeamCount = 1,
+                Continuous = false,
                 Pierce = def.Pierce,
                 Strategy = def.Strategy,
                 Delivery = def.Delivery,

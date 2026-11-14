@@ -1,12 +1,7 @@
 [
   {
     "id": "mg_lv2_quick_feed",
-    "towerId": "machine_gun",
-    "level": 2,
-    "branch": "common",
-    "costFactor": 1.0,
-    "unique": false,
-    "requires": [],
+    "towerId": "machine_gun", "level": 2, "branch": "common", "costFactor": 1.0, "unique": false, "requires": [],
     "modifiers": [
       { "key": "ReloadTime", "op": "Mul", "value": 0.2 },
       { "key": "Ammo", "op": "Mul", "value": 0.8 }
@@ -14,12 +9,7 @@
   },
   {
     "id": "mg_lv2_long_belt",
-    "towerId": "machine_gun",
-    "level": 2,
-    "branch": "common",
-    "costFactor": 1.0,
-    "unique": false,
-    "requires": [],
+    "towerId": "machine_gun", "level": 2, "branch": "common", "costFactor": 1.0, "unique": false, "requires": [],
     "modifiers": [
       { "key": "Ammo", "op": "Mul", "value": 1.8 },
       { "key": "TurnSpeed", "op": "Mul", "value": 0.8 }
@@ -27,12 +17,7 @@
   },
   {
     "id": "mg_lv2_barrel",
-    "towerId": "machine_gun",
-    "level": 2,
-    "branch": "common",
-    "costFactor": 1.0,
-    "unique": false,
-    "requires": [],
+    "towerId": "machine_gun", "level": 2, "branch": "common", "costFactor": 1.0, "unique": false, "requires": [],
     "modifiers": [
       { "key": "Damage", "op": "Mul", "value": 1.4 },
       { "key": "FireRate", "op": "Mul", "value": 0.8 }
@@ -40,11 +25,7 @@
   },
   {
     "id": "mg_lv3_high_speed_bolt",
-    "towerId": "machine_gun",
-    "level": 3,
-    "branch": "common",
-    "costFactor": 1.0,
-    "unique": false,
+    "towerId": "machine_gun", "level": 3, "branch": "common", "costFactor": 1.0, "unique": false,
     "requires": ["mg_lv2_quick_feed", "mg_lv2_long_belt", "mg_lv2_barrel"],
     "modifiers": [
       { "key": "FireRate", "op": "Mul", "value": 1.8 },
@@ -54,11 +35,7 @@
   },
   {
     "id": "mg_lv3_stabilizer",
-    "towerId": "machine_gun",
-    "level": 3,
-    "branch": "common",
-    "costFactor": 1.0,
-    "unique": false,
+    "towerId": "machine_gun", "level": 3, "branch": "common", "costFactor": 1.0, "unique": false,
     "requires": ["mg_lv2_quick_feed", "mg_lv2_long_belt", "mg_lv2_barrel"],
     "modifiers": [
       { "key": "TurnSpeed", "op": "Mul", "value": 1.8 },
@@ -67,11 +44,7 @@
   },
   {
     "id": "mg_lv3_feed_optimize",
-    "towerId": "machine_gun",
-    "level": 3,
-    "branch": "common",
-    "costFactor": 1.0,
-    "unique": false,
+    "towerId": "machine_gun", "level": 3, "branch": "common", "costFactor": 1.0, "unique": false,
     "requires": ["mg_lv2_quick_feed", "mg_lv2_long_belt", "mg_lv2_barrel"],
     "modifiers": [
       { "key": "Ammo", "op": "Mul", "value": 1.2 },
@@ -81,12 +54,20 @@
     ]
   },
   {
+    "id": "mg_lv4_rotary",
+    "towerId": "machine_gun", "level": 4, "branch": "unique", "costFactor": 1.0, "unique": true,
+    "requires": ["mg_lv3_high_speed_bolt", "mg_lv3_stabilizer", "mg_lv3_feed_optimize"],
+    "modifiers": [
+      { "key": "FireRate", "op": "Mul", "value": 1.8 },
+      { "key": "Ammo", "op": "Mul", "value": 2.0 },
+      { "key": "BlockForce", "op": "Mul", "value": 1.5 },
+      { "key": "ReloadTime", "op": "Mul", "value": 0.7 },
+      { "key": "Damage", "op": "Mul", "value": 0.77 }
+    ]
+  },
+  {
     "id": "mg_lv4_antimateriel",
-    "towerId": "machine_gun",
-    "level": 4,
-    "branch": "unique",
-    "costFactor": 1.0,
-    "unique": true,
+    "towerId": "machine_gun", "level": 4, "branch": "unique", "costFactor": 1.0, "unique": true,
     "requires": ["mg_lv3_high_speed_bolt", "mg_lv3_stabilizer", "mg_lv3_feed_optimize"],
     "modifiers": [
       { "key": "Damage", "op": "Mul", "value": 1.8 },
@@ -101,19 +82,376 @@
     "strategy": "Focus"
   },
   {
-    "id": "mg_lv4_rotary",
-    "towerId": "machine_gun",
-    "level": 4,
-    "branch": "unique",
-    "costFactor": 1.0,
-    "unique": true,
-    "requires": ["mg_lv3_high_speed_bolt", "mg_lv3_stabilizer", "mg_lv3_feed_optimize"],
+    "id": "mg_lv5_multi_sync",
+    "towerId": "machine_gun", "level": 5, "branch": "rotary", "costFactor": 1.0, "unique": false,
+    "requires": ["mg_lv4_rotary"],
+    "modifiers": [
+      { "key": "FireRate", "op": "Mul", "value": 1.2 },
+      { "key": "Ammo", "op": "Mul", "value": 1.2 }
+    ]
+  },
+  {
+    "id": "mg_lv5_ammo_box",
+    "towerId": "machine_gun", "level": 5, "branch": "rotary", "costFactor": 1.0, "unique": false,
+    "requires": ["mg_lv4_rotary"],
+    "modifiers": [
+      { "key": "Ammo", "op": "Mul", "value": 1.8 },
+      { "key": "ReloadTime", "op": "Mul", "value": 1.8 }
+    ]
+  },
+  {
+    "id": "mg_lv5_heavy_head",
+    "towerId": "machine_gun", "level": 5, "branch": "rotary", "costFactor": 1.0, "unique": false,
+    "requires": ["mg_lv4_rotary"],
+    "modifiers": [
+      { "key": "Damage", "op": "Mul", "value": 1.2 },
+      { "key": "BlockForce", "op": "Mul", "value": 1.2 },
+      { "key": "FireRate", "op": "Mul", "value": 0.8 }
+    ]
+  },
+  {
+    "id": "mg_lv6_block_barrage",
+    "towerId": "machine_gun", "level": 6, "branch": "rotary", "costFactor": 1.0, "unique": false,
+    "requires": ["mg_lv5_multi_sync", "mg_lv5_ammo_box", "mg_lv5_heavy_head"],
+    "modifiers": [
+      { "key": "BlockForce", "op": "Mul", "value": 1.8 },
+      { "key": "Damage", "op": "Mul", "value": 0.8 }
+    ]
+  },
+  {
+    "id": "mg_lv6_gyro",
+    "towerId": "machine_gun", "level": 6, "branch": "rotary", "costFactor": 1.0, "unique": false,
+    "requires": ["mg_lv5_multi_sync", "mg_lv5_ammo_box", "mg_lv5_heavy_head"],
+    "modifiers": [
+      { "key": "TurnSpeed", "op": "Mul", "value": 1.8 },
+      { "key": "Ammo", "op": "Mul", "value": 0.8 }
+    ]
+  },
+  {
+    "id": "mg_lv6_sustain",
+    "towerId": "machine_gun", "level": 6, "branch": "rotary", "costFactor": 1.0, "unique": false,
+    "requires": ["mg_lv5_multi_sync", "mg_lv5_ammo_box", "mg_lv5_heavy_head"],
+    "modifiers": [
+      { "key": "FireRate", "op": "Mul", "value": 1.2 }
+    ]
+  },
+  {
+    "id": "mg_lv7_du_incendiary",
+    "towerId": "machine_gun", "level": 7, "branch": "unique2", "costFactor": 1.0, "unique": true,
+    "requires": ["mg_lv6_block_barrage", "mg_lv6_gyro", "mg_lv6_sustain"],
+    "modifiers": [
+      { "key": "Retention", "op": "Mul", "value": 1.8 },
+      { "key": "BlockForce", "op": "Mul", "value": 1.5 },
+      { "key": "Damage", "op": "Mul", "value": 0.5 }
+    ]
+  },
+  {
+    "id": "mg_lv7_he",
+    "towerId": "machine_gun", "level": 7, "branch": "unique2", "costFactor": 1.0, "unique": true,
+    "requires": ["mg_lv6_block_barrage", "mg_lv6_gyro", "mg_lv6_sustain"],
+    "modifiers": [
+      { "key": "Retention", "op": "Set", "value": 0.0 },
+      { "key": "Ammo", "op": "Mul", "value": 0.2 },
+      { "key": "ExplosionRadius", "op": "Set", "value": 2.0 }
+    ]
+  },
+  {
+    "id": "mg_lv5_superconducting",
+    "towerId": "machine_gun", "level": 5, "branch": "antimateriel", "costFactor": 1.0, "unique": false,
+    "requires": ["mg_lv4_antimateriel"],
+    "modifiers": [
+      { "key": "FireRate", "op": "Mul", "value": 1.2 },
+      { "key": "Retention", "op": "Mul", "value": 0.8 }
+    ]
+  },
+  {
+    "id": "mg_lv5_rail_extend",
+    "towerId": "machine_gun", "level": 5, "branch": "antimateriel", "costFactor": 1.0, "unique": false,
+    "requires": ["mg_lv4_antimateriel"],
+    "modifiers": [
+      { "key": "Range", "op": "Mul", "value": 1.8 },
+      { "key": "TurnSpeed", "op": "Mul", "value": 0.8 }
+    ]
+  },
+  {
+    "id": "mg_lv5_heavy_core",
+    "towerId": "machine_gun", "level": 5, "branch": "antimateriel", "costFactor": 1.0, "unique": false,
+    "requires": ["mg_lv4_antimateriel"],
+    "modifiers": [
+      { "key": "Damage", "op": "Mul", "value": 1.45 },
+      { "key": "Ammo", "op": "Set", "value": 3.0 }
+    ]
+  },
+  {
+    "id": "mg_lv6_precision_sight",
+    "towerId": "machine_gun", "level": 6, "branch": "antimateriel", "costFactor": 1.0, "unique": false,
+    "requires": ["mg_lv5_superconducting", "mg_lv5_rail_extend", "mg_lv5_heavy_core"],
+    "modifiers": [
+      { "key": "Range", "op": "Mul", "value": 1.2 },
+      { "key": "TurnSpeed", "op": "Mul", "value": 0.8 }
+    ]
+  },
+  {
+    "id": "mg_lv6_fast_charge",
+    "towerId": "machine_gun", "level": 6, "branch": "antimateriel", "costFactor": 1.0, "unique": false,
+    "requires": ["mg_lv5_superconducting", "mg_lv5_rail_extend", "mg_lv5_heavy_core"],
+    "modifiers": [
+      { "key": "FireRate", "op": "Mul", "value": 1.2 },
+      { "key": "ReloadTime", "op": "Mul", "value": 0.9 },
+      { "key": "Range", "op": "Mul", "value": 0.8 }
+    ]
+  },
+  {
+    "id": "mg_lv6_long_rail",
+    "towerId": "machine_gun", "level": 6, "branch": "antimateriel", "costFactor": 1.0, "unique": false,
+    "requires": ["mg_lv5_superconducting", "mg_lv5_rail_extend", "mg_lv5_heavy_core"],
+    "modifiers": [
+      { "key": "Range", "op": "Mul", "value": 1.8 },
+      { "key": "Retention", "op": "Mul", "value": 1.2 },
+      { "key": "TurnSpeed", "op": "Mul", "value": 0.5 },
+      { "key": "FireRate", "op": "Mul", "value": 0.8 }
+    ]
+  },
+  {
+    "id": "mg_lv7_cryo_core",
+    "towerId": "machine_gun", "level": 7, "branch": "unique2", "costFactor": 1.0, "unique": true,
+    "requires": ["mg_lv6_precision_sight", "mg_lv6_fast_charge", "mg_lv6_long_rail"],
+    "modifiers": [
+      { "key": "Retention", "op": "Mul", "value": 1.5 },
+      { "key": "Damage", "op": "Mul", "value": 1.8 }
+    ]
+  },
+  {
+    "id": "mg_lv7_implosion",
+    "towerId": "machine_gun", "level": 7, "branch": "unique2", "costFactor": 1.0, "unique": true,
+    "requires": ["mg_lv6_precision_sight", "mg_lv6_fast_charge", "mg_lv6_long_rail"],
+    "modifiers": [
+      { "key": "Ammo", "op": "Mul", "value": 0.7 },
+      { "key": "ReloadTime", "op": "Mul", "value": 5.0 }
+    ]
+  },
+
+  {
+    "id": "laser_lv2_efficient_cool",
+    "towerId": "laser", "level": 2, "branch": "common", "costFactor": 1.0, "unique": false, "requires": [],
     "modifiers": [
       { "key": "FireRate", "op": "Mul", "value": 1.8 },
-      { "key": "Ammo", "op": "Mul", "value": 2.0 },
-      { "key": "BlockForce", "op": "Mul", "value": 1.5 },
-      { "key": "ReloadTime", "op": "Mul", "value": 0.7 },
-      { "key": "Damage", "op": "Mul", "value": 0.77 }
+      { "key": "Damage", "op": "Mul", "value": 0.65 }
+    ]
+  },
+  {
+    "id": "laser_lv2_gain_medium",
+    "towerId": "laser", "level": 2, "branch": "common", "costFactor": 1.0, "unique": false, "requires": [],
+    "modifiers": [
+      { "key": "Damage", "op": "Mul", "value": 1.8 },
+      { "key": "FireRate", "op": "Mul", "value": 0.65 }
+    ]
+  },
+  {
+    "id": "laser_lv2_rotating_base",
+    "towerId": "laser", "level": 2, "branch": "common", "costFactor": 1.0, "unique": false, "requires": [],
+    "modifiers": [
+      { "key": "TurnSpeed", "op": "Mul", "value": 1.8 },
+      { "key": "FireRate", "op": "Mul", "value": 1.2 },
+      { "key": "Range", "op": "Mul", "value": 0.6 }
+    ]
+  },
+  {
+    "id": "laser_lv3_pulse_compress",
+    "towerId": "laser", "level": 3, "branch": "common", "costFactor": 1.0, "unique": false,
+    "requires": ["laser_lv2_efficient_cool", "laser_lv2_gain_medium", "laser_lv2_rotating_base"],
+    "modifiers": [
+      { "key": "Damage", "op": "Mul", "value": 1.5 },
+      { "key": "FireRate", "op": "Mul", "value": 0.8 },
+      { "key": "Retention", "op": "Set", "value": 1.0 }
+    ]
+  },
+  {
+    "id": "laser_lv3_stable_circuit",
+    "towerId": "laser", "level": 3, "branch": "common", "costFactor": 1.0, "unique": false,
+    "requires": ["laser_lv2_efficient_cool", "laser_lv2_gain_medium", "laser_lv2_rotating_base"],
+    "modifiers": [
+      { "key": "FireRate", "op": "Mul", "value": 1.3 },
+      { "key": "Damage", "op": "Mul", "value": 0.9 }
+    ]
+  },
+  {
+    "id": "laser_lv3_precision_servo",
+    "towerId": "laser", "level": 3, "branch": "common", "costFactor": 1.0, "unique": false,
+    "requires": ["laser_lv2_efficient_cool", "laser_lv2_gain_medium", "laser_lv2_rotating_base"],
+    "modifiers": [
+      { "key": "TurnSpeed", "op": "Mul", "value": 1.8 },
+      { "key": "FireRate", "op": "Mul", "value": 1.15 },
+      { "key": "Range", "op": "Mul", "value": 0.6 }
+    ]
+  },
+  {
+    "id": "laser_lv4_focus_lens",
+    "towerId": "laser", "level": 4, "branch": "unique", "costFactor": 1.0, "unique": true,
+    "requires": ["laser_lv3_pulse_compress", "laser_lv3_stable_circuit", "laser_lv3_precision_servo"],
+    "modifiers": [
+      { "key": "BeamWidth", "op": "Set", "value": 2.0 },
+      { "key": "Retention", "op": "Set", "value": 9.0 }
+    ],
+    "pierce": "Mid",
+    "strategy": "Focus",
+    "continuous": true
+  },
+  {
+    "id": "laser_lv4_sweep_lens",
+    "towerId": "laser", "level": 4, "branch": "unique", "costFactor": 1.0, "unique": true,
+    "requires": ["laser_lv3_pulse_compress", "laser_lv3_stable_circuit", "laser_lv3_precision_servo"],
+    "modifiers": [
+      { "key": "BeamWidth", "op": "Set", "value": 1.0 },
+      { "key": "BeamCount", "op": "Set", "value": 3.0 },
+      { "key": "Damage", "op": "Mul", "value": 0.5 }
+    ],
+    "pierce": "Low",
+    "strategy": "Spray",
+    "continuous": true
+  },
+  {
+    "id": "laser_lv5_dual_expand",
+    "towerId": "laser", "level": 5, "branch": "focus", "costFactor": 1.0, "unique": false,
+    "requires": ["laser_lv4_focus_lens"],
+    "modifiers": [
+      { "key": "BeamWidth", "op": "Add", "value": 1.0 },
+      { "key": "FireRate", "op": "Mul", "value": 1.3 },
+      { "key": "Damage", "op": "Mul", "value": 0.9 }
+    ]
+  },
+  {
+    "id": "laser_lv5_cryo_cavity",
+    "towerId": "laser", "level": 5, "branch": "focus", "costFactor": 1.0, "unique": false,
+    "requires": ["laser_lv4_focus_lens"],
+    "modifiers": [
+      { "key": "Retention", "op": "Mul", "value": 1.8 },
+      { "key": "TurnSpeed", "op": "Mul", "value": 0.2 }
+    ]
+  },
+  {
+    "id": "laser_lv5_high_pressure",
+    "towerId": "laser", "level": 5, "branch": "focus", "costFactor": 1.0, "unique": false,
+    "requires": ["laser_lv4_focus_lens"],
+    "modifiers": [
+      { "key": "Damage", "op": "Mul", "value": 1.8 },
+      { "key": "FireRate", "op": "Mul", "value": 0.65 }
+    ]
+  },
+  {
+    "id": "laser_lv6_focus_lock",
+    "towerId": "laser", "level": 6, "branch": "focus", "costFactor": 1.0, "unique": false,
+    "requires": ["laser_lv5_dual_expand", "laser_lv5_cryo_cavity", "laser_lv5_high_pressure"],
+    "modifiers": [
+      { "key": "Damage", "op": "Mul", "value": 1.5 }
+    ]
+  },
+  {
+    "id": "laser_lv6_compression",
+    "towerId": "laser", "level": 6, "branch": "focus", "costFactor": 1.0, "unique": false,
+    "requires": ["laser_lv5_dual_expand", "laser_lv5_cryo_cavity", "laser_lv5_high_pressure"],
+    "modifiers": [
+      { "key": "BeamWidth", "op": "Set", "value": 0.4 },
+      { "key": "Damage", "op": "Mul", "value": 1.35 }
+    ]
+  },
+  {
+    "id": "laser_lv6_heat_matrix",
+    "towerId": "laser", "level": 6, "branch": "focus", "costFactor": 1.0, "unique": false,
+    "requires": ["laser_lv5_dual_expand", "laser_lv5_cryo_cavity", "laser_lv5_high_pressure"],
+    "modifiers": [
+      { "key": "FireRate", "op": "Mul", "value": 1.5 },
+      { "key": "Damage", "op": "Mul", "value": 0.8 }
+    ]
+  },
+  {
+    "id": "laser_lv5_split_prism",
+    "towerId": "laser", "level": 5, "branch": "sweep", "costFactor": 1.0, "unique": false,
+    "requires": ["laser_lv4_sweep_lens"],
+    "modifiers": [
+      { "key": "BeamCount", "op": "Add", "value": 1.0 },
+      { "key": "Damage", "op": "Mul", "value": 0.9 }
+    ]
+  },
+  {
+    "id": "laser_lv5_wide_sweep",
+    "towerId": "laser", "level": 5, "branch": "sweep", "costFactor": 1.0, "unique": false,
+    "requires": ["laser_lv4_sweep_lens"],
+    "modifiers": [
+      { "key": "FireRate", "op": "Mul", "value": 1.3 },
+      { "key": "Damage", "op": "Mul", "value": 0.9 }
+    ]
+  },
+  {
+    "id": "laser_lv5_high_speed_galvo",
+    "towerId": "laser", "level": 5, "branch": "sweep", "costFactor": 1.0, "unique": false,
+    "requires": ["laser_lv4_sweep_lens"],
+    "modifiers": [
+      { "key": "FireRate", "op": "Mul", "value": 1.3 },
+      { "key": "Damage", "op": "Mul", "value": 0.9 }
+    ]
+  },
+  {
+    "id": "laser_lv6_rotate_strike",
+    "towerId": "laser", "level": 6, "branch": "sweep", "costFactor": 1.0, "unique": false,
+    "requires": ["laser_lv5_split_prism", "laser_lv5_wide_sweep", "laser_lv5_high_speed_galvo"],
+    "modifiers": [
+      { "key": "Damage", "op": "Mul", "value": 1.2 }
+    ]
+  },
+  {
+    "id": "laser_lv6_stable_resonance",
+    "towerId": "laser", "level": 6, "branch": "sweep", "costFactor": 1.0, "unique": false,
+    "requires": ["laser_lv5_split_prism", "laser_lv5_wide_sweep", "laser_lv5_high_speed_galvo"],
+    "modifiers": [
+      { "key": "FireRate", "op": "Mul", "value": 1.2 },
+      { "key": "Retention", "op": "Mul", "value": 0.8 }
+    ]
+  },
+  {
+    "id": "laser_lv6_long_array",
+    "towerId": "laser", "level": 6, "branch": "sweep", "costFactor": 1.0, "unique": false,
+    "requires": ["laser_lv5_split_prism", "laser_lv5_wide_sweep", "laser_lv5_high_speed_galvo"],
+    "modifiers": [
+      { "key": "Range", "op": "Mul", "value": 1.8 },
+      { "key": "TurnSpeed", "op": "Mul", "value": 0.8 }
+    ]
+  },
+  {
+    "id": "laser_lv7_thermal_melt",
+    "towerId": "laser", "level": 7, "branch": "unique2", "costFactor": 1.0, "unique": true,
+    "requires": ["laser_lv6_focus_lock", "laser_lv6_compression", "laser_lv6_heat_matrix"],
+    "modifiers": [
+      { "key": "Damage", "op": "Mul", "value": 1.5 },
+      { "key": "Retention", "op": "Set", "value": 99.0 }
+    ]
+  },
+  {
+    "id": "laser_lv7_quantum_pressure",
+    "towerId": "laser", "level": 7, "branch": "unique2", "costFactor": 1.0, "unique": true,
+    "requires": ["laser_lv6_focus_lock", "laser_lv6_compression", "laser_lv6_heat_matrix"],
+    "modifiers": [
+      { "key": "BeamWidth", "op": "Set", "value": 3.0 },
+      { "key": "BlockForce", "op": "Set", "value": 4.0 },
+      { "key": "Damage", "op": "Mul", "value": 0.9 }
+    ]
+  },
+  {
+    "id": "laser_lv7_scatter_prism",
+    "towerId": "laser", "level": 7, "branch": "unique2", "costFactor": 1.0, "unique": true,
+    "requires": ["laser_lv6_rotate_strike", "laser_lv6_stable_resonance", "laser_lv6_long_array"],
+    "modifiers": [
+      { "key": "BeamWidth", "op": "Set", "value": 3.0 },
+      { "key": "FireRate", "op": "Mul", "value": 0.8 }
+    ]
+  },
+  {
+    "id": "laser_lv7_enriched_plutonium",
+    "towerId": "laser", "level": 7, "branch": "unique2", "costFactor": 1.0, "unique": true,
+    "requires": ["laser_lv6_rotate_strike", "laser_lv6_stable_resonance", "laser_lv6_long_array"],
+    "modifiers": [
+      { "key": "Damage", "op": "Mul", "value": 0.2 },
+      { "key": "Retention", "op": "Set", "value": 99.0 }
     ]
   }
 ]

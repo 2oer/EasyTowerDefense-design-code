@@ -15,7 +15,10 @@ namespace Game.Model
         ReloadTime = 7,
         BeamWidth = 8,
         BulletRadius = 9,
-        ExplosionRadius = 10
+        ExplosionRadius = 10,
+
+        /// <summary>激光束数量;默认 1。</summary>
+        BeamCount = 11
     }
 
     public enum ModifierOp
@@ -64,5 +67,8 @@ namespace Game.Model
 
         /// <summary>非空时覆盖索敌策略。</summary>
         public TowerStrategy? Strategy { get; set; }
+
+        /// <summary>转为持续照射型(聚焦 / 扫荡透镜):按弹容与重装折算等效射速。</summary>
+        public bool Continuous { get; set; }
     }
 }
