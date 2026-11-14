@@ -64,7 +64,10 @@ namespace Game.Model
                 if (d.StartGold < 0) throw new ModelValidationException(d.Id + ": startGold 不得为负");
                 if (d.SmallBase <= 0) throw new ModelValidationException(d.Id + ": smallBase 必须 > 0");
                 if (d.SmallStep < 0) throw new ModelValidationException(d.Id + ": smallStep 不得为负");
+                if (d.SmallStepEarly < 0) throw new ModelValidationException(d.Id + ": smallStepEarly 不得为负");
             }
+
+            ValidateUpgrades(db);
 
             if (db.FindDifficulty("normal") == null)
                 throw new ModelValidationException("缺少 normal 难度");
@@ -94,8 +97,48 @@ namespace Game.Model
             if (w.DurationMin <= 0f || w.DurationMax < w.DurationMin)
                 throw new ModelValidationException("波次时长区间非法");
             if (w.HardCap <= 0) throw new ModelValidationException("hardCap 必须 > 0");
+            if (w.EarlyGrowthWaves < 1) throw new ModelValidationException("earlyGrowthWaves 必须 ≥ 1");
+            if (w.WaveClearGold < 0) throw new ModelValidationException("waveClearGold 不得为负");
             if (w.MediumGrowth <= 1f || w.LargeGrowth <= 1f)
                 throw new ModelValidationException("中 / 大型成长倍率必须 > 1");
+        }
+
+        private static void ValidateUpgrades(ModelDatabase db)
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < db.Upgrades.Count; i++)
+            {
+                UpgradeNodeDef u = db.Upgrades[i];
+                if (string.IsNullOrWhiteSpace(u.Id)) throw new ModelValidationException("升级节点 id 为空");
+                if (!seen.Add(u.Id)) throw new ModelValidationException(u.Id + ": 升级节点 id 重复");
+                if (db.FindTower(u.TowerId) == null)
+                    throw new ModelValidationException(u.Id + ": towerId 不存在:" + u.TowerId);
+                if (u.Level < 2 || u.Level > 7)
+                    throw new ModelValidationException(u.Id + ": level 必须在 2–7");
+                if (u.CostFactor <= 0f)
+                    throw new ModelValidationException(u.Id + ": costFactor 必须 > 0");
+                if (u.Unique && u.Level != 4 && u.Level != 7)
+                    throw new ModelValidationException(u.Id + ": unique 只能出现在 Lv4 / Lv7");
+
+                for (int r = 0; r < u.Requires.Count; r++)
+                {
+                    string reqId = u.Requires[r];
+                    UpgradeNodeDef? req = db.FindUpgrade(reqId);
+                    if (req == null)
+                        throw new ModelValidationException(u.Id + ": 前置节点不存在:" + reqId);
+                    if (req.Level != u.Level - 1)
+                        throw new ModelValidationException(u.Id + ": 前置节点等级必须恰好低一级:" + reqId);
+                }
+
+                for (int m = 0; m < u.Modifiers.Count; m++)
+                {
+                    StatModifier mod = u.Modifiers[m];
+                    if (float.IsNaN(mod.Value) || float.IsInfinity(mod.Value))
+                        throw new ModelValidationException(u.Id + ": 修饰值非法");
+                    if (mod.Op == ModifierOp.Mul && mod.Value <= 0f)
+                        throw new ModelValidationException(u.Id + ": Mul 修饰值必须 > 0");
+                }
+            }
         }
 
         private static void CheckDecay(string id, string field, float value)

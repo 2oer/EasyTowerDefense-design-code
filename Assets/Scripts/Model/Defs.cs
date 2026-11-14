@@ -105,7 +105,13 @@ namespace Game.Model
         public float LargeShare { get; set; } = 1f;
         public int StartGold { get; set; }
         public int SmallBase { get; set; }
+
+        /// <summary>第 11 波起的小型每波增量。</summary>
         public int SmallStep { get; set; }
+
+        /// <summary>前 10 波的小型每波增量;0 表示沿用 SmallStep。</summary>
+        public int SmallStepEarly { get; set; }
+
         public float MetaRate { get; set; } = 1f;
     }
 
@@ -130,6 +136,12 @@ namespace Game.Model
         public float SpawnIntervalMax { get; set; } = 0.6f;
         public float TierEarlyUnlockRatio { get; set; } = 0.30f;
         public int HardCap { get; set; } = 500;
+
+        /// <summary>小型成长提速的波数上限(含),此后回落到 SmallStep。</summary>
+        public int EarlyGrowthWaves { get; set; } = 10;
+
+        /// <summary>每波清场固定金币(再乘难度金币率)。</summary>
+        public int WaveClearGold { get; set; } = 60;
     }
 
     public sealed class SlotDef

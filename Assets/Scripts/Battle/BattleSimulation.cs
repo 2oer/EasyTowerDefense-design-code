@@ -21,11 +21,18 @@ namespace Game.Battle
         private readonly EntityWorld _world = new EntityWorld();
         private readonly WaveDirector _director;
         private readonly EconomySystem _economy;
+        private readonly UpgradeService _upgrades;
         private readonly List<EnemyRuntime> _hitBuffer = new List<EnemyRuntime>();
 
         private readonly List<string> _buildOrder = new List<string>
         {
             "laser", "machine_gun", "machine_gun", "laser"
+        };
+
+        /// <summary>机枪塔升级路线:快速供弹 → 高速枪机 → 电磁反器材。</summary>
+        private static readonly string[] MgUpgradePath =
+        {
+            "mg_lv2_quick_feed", "mg_lv3_high_speed_bolt", "mg_lv4_antimateriel"
         };
 
         private int _builtCount;
@@ -45,6 +52,7 @@ namespace Game.Battle
             _rng = new Rng(seed);
             _director = new WaveDirector(db, difficulty, map, _rng);
             _economy = new EconomySystem(difficulty);
+            _upgrades = new UpgradeService(db, _economy);
 
             BaseMaxHp = baseMaxHpOverride > 0f ? baseMaxHpOverride : map.BaseMaxHp;
             BaseHp = BaseMaxHp;
@@ -54,6 +62,7 @@ namespace Game.Battle
 
         public Action<int>? OnWaveStart;
         public Action<int, int, int, int>? OnWaveEnd;
+        public Action<int, string, int>? OnUpgrade;
         public Action? OnFinished;
 
         public int Tick { get; private set; }
@@ -96,6 +105,7 @@ namespace Game.Battle
                 WaveGold = 0;
                 WaveSpawned = 0;
                 TryBuild();
+                TryUpgrade();
                 OnWaveStart?.Invoke(wave);
             }
 
@@ -142,6 +152,7 @@ namespace Game.Battle
 
             if (_director.ConsumeWaveCompleted(out int completedWave))
             {
+                WaveGold += _economy.AwardWaveClear(_db.Waves.WaveClearGold);
                 _economy.AwardWaveMeta(completedWave, _director.IsLargeWave(completedWave));
                 OnWaveEnd?.Invoke(completedWave, WaveKills, WaveLeaks, WaveGold);
             }
@@ -194,7 +205,7 @@ namespace Game.Battle
             for (int i = 0; i < _world.Towers.Count; i++)
             {
                 TowerAgent tower = _world.Towers[i];
-                float edge = tower.Position.Y + tower.Def.Range;
+                float edge = tower.Position.Y + tower.Stats.Range;
                 if (edge > maxEdge) maxEdge = edge;
             }
 
@@ -230,6 +241,21 @@ namespace Game.Battle
                 SlotDef slot = _map.Slots[_builtCount];
                 _world.AddTower(def, new Vec2(slot.X, slot.Y));
                 _builtCount++;
+            }
+        }
+
+        private void TryUpgrade()
+        {
+            for (int i = 0; i < _world.Towers.Count; i++)
+            {
+                TowerAgent tower = _world.Towers[i];
+                if (tower.Def.Id != "machine_gun") continue;
+
+                for (int p = tower.Upgrades.Count; p < MgUpgradePath.Length; p++)
+                {
+                    if (!_upgrades.TryApply(tower, MgUpgradePath[p], out int cost)) break;
+                    OnUpgrade?.Invoke(tower.Id.Index, MgUpgradePath[p], cost);
+                }
             }
         }
 

@@ -8,6 +8,7 @@
     "startGold": 400,
     "smallBase": 26,
     "smallStep": 10,
+    "smallStepEarly": 13,
     "metaRate": 1.2
   },
   {
@@ -19,6 +20,7 @@
     "startGold": 300,
     "smallBase": 30,
     "smallStep": 12,
+    "smallStepEarly": 16,
     "metaRate": 1.0
   },
   {
@@ -30,6 +32,7 @@
     "startGold": 250,
     "smallBase": 34,
     "smallStep": 14,
+    "smallStepEarly": 18,
     "metaRate": 0.9
   }
 ]

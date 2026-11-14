@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using Game.Battle;
@@ -15,7 +16,7 @@ namespace SimHarness
         public string MapId = "standard";
         public string DefsPath = Path.Combine(AppContext.BaseDirectory, "Defs");
         public float BaseHpOverride;
-        public float WaveTimeout = 300f;
+        public float WaveTimeout = 900f;
         public bool SelfTest;
 
         public static CliOptions Parse(string[] args)
@@ -80,6 +81,7 @@ namespace SimHarness
                 " enemies=" + db.Enemies.Count +
                 " difficulties=" + db.Difficulties.Count +
                 " maps=" + db.Maps.Count +
+                " upgrades=" + db.Upgrades.Count +
                 " tiers=" + db.Waves.Tiers);
 
             if (options.SelfTest)
@@ -121,6 +123,14 @@ namespace SimHarness
                 if (verbose) Console.WriteLine("[wave " + wave.ToString("00") + "] start" + (wave % 5 == 0 ? " (大型波)" : string.Empty));
             };
 
+            sim.OnUpgrade = (towerIndex, nodeId, cost) =>
+            {
+                if (!verbose) return;
+                Console.WriteLine("[upgrade] wave " + sim.Wave.ToString("00") +
+                                  " tower#" + towerIndex + " " + nodeId +
+                                  " -" + cost + "g (left=" + sim.Gold + ")");
+            };
+
             sim.OnWaveEnd = (wave, kills, leaks, gold) =>
             {
                 if (!verbose) return;
@@ -136,7 +146,7 @@ namespace SimHarness
 
             sim.Begin(options.Waves);
 
-            int guard = options.Waves * 12000;
+            int guard = options.Waves * 30000;
             int ticks = 0;
             string stopReason = "running";
             while (!sim.Finished && ticks < guard)
@@ -221,8 +231,38 @@ namespace SimHarness
             ok &= Check("机枪塔存在且射速 3", mg != null && Math.Abs(mg.FireRate - 3f) < 1e-4f ? 1f : 0f, 1f);
             ok &= Check("激光塔存在且束宽 0.5", laser != null && Math.Abs(laser.BeamWidth - 0.5f) < 1e-4f ? 1f : 0f, 1f);
 
+            UpgradeNodeDef? lv2 = db.FindUpgrade("mg_lv2_quick_feed");
+            UpgradeNodeDef? lv3 = db.FindUpgrade("mg_lv3_high_speed_bolt");
+            UpgradeNodeDef? lv4 = db.FindUpgrade("mg_lv4_antimateriel");
+            bool chainOk = mg != null && lv2 != null && lv3 != null && lv4 != null;
+            ok &= Check("电磁反器材升级链存在(Lv2/Lv3/Lv4)", chainOk ? 1f : 0f, 1f);
+
+            if (chainOk)
+            {
+                var nodes = new List<UpgradeNodeDef> { lv2!, lv3!, lv4! };
+                TowerRuntimeStats stats = TowerStatsBuilder.Build(mg!, nodes);
+                ok &= Check("电磁反器材 伤害 57.6", stats.Damage, 57.6f);
+                ok &= Check("电磁反器材 射速 1.8", stats.FireRate, 1.8f);
+                ok &= Check("电磁反器材 弹匣 10", stats.Ammo, 10f);
+                ok &= Check("电磁反器材 换弹 0.54", stats.ReloadTime, 0.54f);
+                ok &= Check("电磁反器材 射程 33.75", stats.Range, 33.75f);
+                ok &= Check("电磁反器材 留存 10", stats.Retention, 10f);
+                ok &= Check("电磁反器材 高级穿甲", stats.Pierce == ArmorPierce.High ? 1f : 0f, 1f);
+                ok &= Check("电磁反器材 集中策略", stats.Strategy == TowerStrategy.Focus ? 1f : 0f, 1f);
+                ok &= Check("升级费用 Lv2+Lv3+Lv4 = 1625",
+                    CostOf(mg!, lv2!) + CostOf(mg!, lv3!) + CostOf(mg!, lv4!), 1625f);
+            }
+
             Console.WriteLine("[selftest] " + (ok ? "PASS" : "FAIL") + " seed=" + options.Seed);
             return ok;
+        }
+
+        private static int CostOf(TowerDef def, UpgradeNodeDef node)
+        {
+            double steps = node.Level - 1;
+            double cost = def.Price * (double)node.CostFactor * steps * steps;
+            if (node.Unique) cost *= 1.25;
+            return (int)Math.Round(cost, MidpointRounding.AwayFromZero);
         }
 
         private static float CountHits(in DamagePacket probe, EnemyDef def)

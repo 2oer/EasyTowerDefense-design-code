@@ -1,0 +1,119 @@
+[
+  {
+    "id": "mg_lv2_quick_feed",
+    "towerId": "machine_gun",
+    "level": 2,
+    "branch": "common",
+    "costFactor": 1.0,
+    "unique": false,
+    "requires": [],
+    "modifiers": [
+      { "key": "ReloadTime", "op": "Mul", "value": 0.2 },
+      { "key": "Ammo", "op": "Mul", "value": 0.8 }
+    ]
+  },
+  {
+    "id": "mg_lv2_long_belt",
+    "towerId": "machine_gun",
+    "level": 2,
+    "branch": "common",
+    "costFactor": 1.0,
+    "unique": false,
+    "requires": [],
+    "modifiers": [
+      { "key": "Ammo", "op": "Mul", "value": 1.8 },
+      { "key": "TurnSpeed", "op": "Mul", "value": 0.8 }
+    ]
+  },
+  {
+    "id": "mg_lv2_barrel",
+    "towerId": "machine_gun",
+    "level": 2,
+    "branch": "common",
+    "costFactor": 1.0,
+    "unique": false,
+    "requires": [],
+    "modifiers": [
+      { "key": "Damage", "op": "Mul", "value": 1.4 },
+      { "key": "FireRate", "op": "Mul", "value": 0.8 }
+    ]
+  },
+  {
+    "id": "mg_lv3_high_speed_bolt",
+    "towerId": "machine_gun",
+    "level": 3,
+    "branch": "common",
+    "costFactor": 1.0,
+    "unique": false,
+    "requires": ["mg_lv2_quick_feed", "mg_lv2_long_belt", "mg_lv2_barrel"],
+    "modifiers": [
+      { "key": "FireRate", "op": "Mul", "value": 1.8 },
+      { "key": "BlockForce", "op": "Mul", "value": 1.2 },
+      { "key": "Damage", "op": "Mul", "value": 0.8 }
+    ]
+  },
+  {
+    "id": "mg_lv3_stabilizer",
+    "towerId": "machine_gun",
+    "level": 3,
+    "branch": "common",
+    "costFactor": 1.0,
+    "unique": false,
+    "requires": ["mg_lv2_quick_feed", "mg_lv2_long_belt", "mg_lv2_barrel"],
+    "modifiers": [
+      { "key": "TurnSpeed", "op": "Mul", "value": 1.8 },
+      { "key": "ReloadTime", "op": "Mul", "value": 1.2 }
+    ]
+  },
+  {
+    "id": "mg_lv3_feed_optimize",
+    "towerId": "machine_gun",
+    "level": 3,
+    "branch": "common",
+    "costFactor": 1.0,
+    "unique": false,
+    "requires": ["mg_lv2_quick_feed", "mg_lv2_long_belt", "mg_lv2_barrel"],
+    "modifiers": [
+      { "key": "Ammo", "op": "Mul", "value": 1.2 },
+      { "key": "ReloadTime", "op": "Mul", "value": 0.8 },
+      { "key": "BlockForce", "op": "Mul", "value": 1.2 },
+      { "key": "TurnSpeed", "op": "Mul", "value": 0.8 }
+    ]
+  },
+  {
+    "id": "mg_lv4_antimateriel",
+    "towerId": "machine_gun",
+    "level": 4,
+    "branch": "unique",
+    "costFactor": 1.0,
+    "unique": true,
+    "requires": ["mg_lv3_high_speed_bolt", "mg_lv3_stabilizer", "mg_lv3_feed_optimize"],
+    "modifiers": [
+      { "key": "Damage", "op": "Mul", "value": 1.8 },
+      { "key": "Range", "op": "Mul", "value": 1.35 },
+      { "key": "Retention", "op": "Set", "value": 10.0 },
+      { "key": "TurnSpeed", "op": "Mul", "value": 1.125 },
+      { "key": "FireRate", "op": "Mul", "value": 0.3333333 },
+      { "key": "ReloadTime", "op": "Mul", "value": 0.9 },
+      { "key": "Ammo", "op": "Set", "value": 10.0 }
+    ],
+    "pierce": "High",
+    "strategy": "Focus"
+  },
+  {
+    "id": "mg_lv4_rotary",
+    "towerId": "machine_gun",
+    "level": 4,
+    "branch": "unique",
+    "costFactor": 1.0,
+    "unique": true,
+    "requires": ["mg_lv3_high_speed_bolt", "mg_lv3_stabilizer", "mg_lv3_feed_optimize"],
+    "modifiers": [
+      { "key": "FireRate", "op": "Mul", "value": 1.8 },
+      { "key": "Ammo", "op": "Mul", "value": 2.0 },
+      { "key": "BlockForce", "op": "Mul", "value": 1.5 },
+      { "key": "ReloadTime", "op": "Mul", "value": 0.7 },
+      { "key": "Damage", "op": "Mul", "value": 0.77 }
+    ]
+  }
+]

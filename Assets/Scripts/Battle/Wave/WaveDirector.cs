@@ -192,7 +192,14 @@ namespace Game.Battle
         {
             _roster.Clear();
 
-            int small = _difficulty.SmallBase + _difficulty.SmallStep * (_wave - 1);
+            int earlyWaves = Math.Max(1, _rules.EarlyGrowthWaves);
+            int earlySteps = Math.Min(_wave, earlyWaves) - 1;
+            int lateSteps = Math.Max(0, _wave - earlyWaves);
+            int earlyStep = _difficulty.SmallStepEarly > 0 ? _difficulty.SmallStepEarly : _difficulty.SmallStep;
+
+            int small = _difficulty.SmallBase
+                      + earlyStep * earlySteps
+                      + _difficulty.SmallStep * lateSteps;
             if (IsLargeWave(_wave))
                 small = MathUtil.RoundToInt(small * _rules.LargeWaveMultiplier);
 

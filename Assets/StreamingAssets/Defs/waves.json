@@ -16,5 +16,7 @@
   "spawnIntervalMin": 0.25,
   "spawnIntervalMax": 0.6,
   "tierEarlyUnlockRatio": 0.30,
-  "hardCap": 500
+  "hardCap": 500,
+  "earlyGrowthWaves": 10,
+  "waveClearGold": 60
 }

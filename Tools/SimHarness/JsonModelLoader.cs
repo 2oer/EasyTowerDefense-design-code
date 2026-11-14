@@ -27,6 +27,7 @@ namespace SimHarness
             db.Enemies.AddRange(Read<List<EnemyDef>>(Path.Combine(directory, "enemies.json"), options));
             db.Difficulties.AddRange(Read<List<DifficultyDef>>(Path.Combine(directory, "difficulties.json"), options));
             db.Maps.AddRange(Read<List<MapDef>>(Path.Combine(directory, "maps.json"), options));
+            db.Upgrades.AddRange(Read<List<UpgradeNodeDef>>(Path.Combine(directory, "upgrades.json"), options));
             db.Waves = Read<WaveRules>(Path.Combine(directory, "waves.json"), options);
             return db;
         }

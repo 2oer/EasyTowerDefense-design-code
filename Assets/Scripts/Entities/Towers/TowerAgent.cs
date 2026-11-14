@@ -67,8 +67,12 @@ namespace Game.Entity
     {
         public EntityId Id { get; private set; }
         public TowerDef Def { get; private set; } = null!;
+        public TowerRuntimeStats Stats { get; private set; } = null!;
         public Vec2 Position { get; private set; }
         public TurretMotor Motor { get; } = new TurretMotor();
+
+        /// <summary>已选升级节点(按等级升序)。</summary>
+        public List<UpgradeNodeDef> Upgrades { get; } = new List<UpgradeNodeDef>();
 
         public float Cooldown { get; private set; }
         public float ReloadTimer { get; private set; }
@@ -76,17 +80,39 @@ namespace Game.Entity
         public int LastHitCount { get; private set; }
 
         public bool Reloading => ReloadTimer > 0f;
+        public int Level => 1 + Upgrades.Count;
 
         public void Initialize(EntityId id, TowerDef def, Vec2 position)
         {
             Id = id;
             Def = def;
             Position = position;
-            Ammo = def.Ammo;
+            Upgrades.Clear();
+            Stats = TowerStatsBuilder.Build(def, Upgrades);
+            Ammo = Stats.Ammo;
             Cooldown = 0f;
             ReloadTimer = 0f;
             LastHitCount = 0;
             Motor.Reset((float)Math.PI * 0.5f);
+        }
+
+        public bool HasUpgrade(string nodeId)
+        {
+            for (int i = 0; i < Upgrades.Count; i++)
+            {
+                if (string.Equals(Upgrades[i].Id, nodeId, StringComparison.Ordinal)) return true;
+            }
+            return false;
+        }
+
+        /// <summary>应用一次升级并整份重建运行时属性;新弹匣立即装满。</summary>
+        public void ApplyUpgrade(UpgradeNodeDef node)
+        {
+            Upgrades.Add(node);
+            Stats = TowerStatsBuilder.Build(Def, Upgrades);
+            Ammo = Stats.Ammo;
+            Cooldown = 0f;
+            ReloadTimer = 0f;
         }
 
         /// <summary>返回本帧是否开火。</summary>
@@ -98,7 +124,7 @@ namespace Game.Entity
                 if (ReloadTimer <= 0f)
                 {
                     ReloadTimer = 0f;
-                    Ammo = Def.Ammo;
+                    Ammo = Stats.Ammo;
                 }
                 LastHitCount = 0;
                 return false;
@@ -108,15 +134,15 @@ namespace Game.Entity
 
             var probe = new DamagePacket
             {
-                Amount = Def.Damage,
-                Type = Def.Delivery == DeliveryKind.HitscanRect ? DamageType.Energy : DamageType.Ballistic,
-                Pierce = Def.Pierce,
-                Retention = Def.Retention,
-                BlockForce = Def.BlockForce,
+                Amount = Stats.Damage,
+                Type = Stats.DamageType,
+                Pierce = Stats.Pierce,
+                Retention = Stats.Retention,
+                BlockForce = Stats.BlockForce,
                 Source = Id
             };
 
-            int targetIndex = TargetSelector.SelectBest(enemies, Position, Def.Range, probe, Def.Strategy);
+            int targetIndex = TargetSelector.SelectBest(enemies, Position, Stats.Range, probe, Stats.Strategy);
             if (targetIndex < 0)
             {
                 LastHitCount = 0;
@@ -132,7 +158,7 @@ namespace Game.Entity
                 TurretMotor.PointBlankToleranceRad,
                 (float)Math.Atan2(halfWidth, faceDistance));
 
-            if (!Motor.TurnTowards(desired, Def.TurnSpeed, tolerance, dt))
+            if (!Motor.TurnTowards(desired, Stats.TurnSpeed, tolerance, dt))
             {
                 LastHitCount = 0;
                 return false;
@@ -149,37 +175,37 @@ namespace Game.Entity
         }
 
         private float HalfWidth() =>
-            Def.Delivery == DeliveryKind.HitscanRect ? Def.BeamWidth * 0.5f : Def.BulletRadius;
+            Stats.Delivery == DeliveryKind.HitscanRect ? Stats.BeamWidth * 0.5f : Stats.BulletRadius;
 
         private void Fire(IReadOnlyList<EnemyRuntime> enemies, List<EnemyRuntime> hitBuffer)
         {
-            Cooldown = 1f / Def.FireRate;
+            Cooldown = 1f / Stats.FireRate;
 
-            if (Def.Ammo > 0)
+            if (Stats.Ammo > 0)
             {
                 Ammo--;
                 if (Ammo <= 0)
                 {
                     Ammo = 0;
-                    ReloadTimer = Def.ReloadTime;
+                    ReloadTimer = Stats.ReloadTime;
                 }
             }
 
             float angle = Motor.AimAngle;
             var direction = new Vec2((float)Math.Cos(angle), (float)Math.Sin(angle));
-            HitscanResolver.Query(Position, direction, Def.Range, HalfWidth(), enemies, hitBuffer);
+            HitscanResolver.Query(Position, direction, Stats.Range, HalfWidth(), enemies, hitBuffer);
 
             var packet = new DamagePacket
             {
-                Amount = Def.Damage,
-                Type = Def.Delivery == DeliveryKind.HitscanRect ? DamageType.Energy : DamageType.Ballistic,
-                Pierce = Def.Pierce,
-                Retention = Def.Retention,
-                BlockForce = Def.BlockForce,
+                Amount = Stats.Damage,
+                Type = Stats.DamageType,
+                Pierce = Stats.Pierce,
+                Retention = Stats.Retention,
+                BlockForce = Stats.BlockForce,
                 Source = Id
             };
 
-            float retention = Def.Retention;
+            float retention = Stats.Retention;
             int hits = 0;
             for (int i = 0; i < hitBuffer.Count; i++)
             {
@@ -187,7 +213,7 @@ namespace Game.Entity
                 if (!enemy.Alive) continue;
 
                 float amount = DamageCalculator.Amount(packet, enemy.Def);
-                enemy.ApplyDamage(amount, Def.BlockForce);
+                enemy.ApplyDamage(amount, Stats.BlockForce);
                 hits++;
 
                 retention = PenetrationResolver.Consume(retention, packet, enemy.Def);

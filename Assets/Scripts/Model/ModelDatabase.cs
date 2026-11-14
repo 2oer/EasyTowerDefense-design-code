@@ -10,6 +10,7 @@ namespace Game.Model
         public List<EnemyDef> Enemies { get; } = new List<EnemyDef>();
         public List<DifficultyDef> Difficulties { get; } = new List<DifficultyDef>();
         public List<MapDef> Maps { get; } = new List<MapDef>();
+        public List<UpgradeNodeDef> Upgrades { get; } = new List<UpgradeNodeDef>();
         public WaveRules Waves { get; set; } = new WaveRules();
 
         public TowerDef? FindTower(string id)
@@ -48,6 +49,15 @@ namespace Game.Model
                 if (Enemies[i].Size == size) result.Add(Enemies[i]);
             }
             return result;
+        }
+
+        public UpgradeNodeDef? FindUpgrade(string id)
+        {
+            for (int i = 0; i < Upgrades.Count; i++)
+            {
+                if (string.Equals(Upgrades[i].Id, id, StringComparison.Ordinal)) return Upgrades[i];
+            }
+            return null;
         }
     }
 }
