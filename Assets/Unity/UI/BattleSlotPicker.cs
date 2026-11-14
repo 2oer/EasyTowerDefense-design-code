@@ -15,7 +15,7 @@ namespace Game.UnityBridge.UI
         [SerializeField] private Camera worldCamera;
         [SerializeField] private BattleDriver driver;
         [SerializeField] private BattleViewRoot viewRoot;
-        [SerializeField] private BuildController controller;
+        [SerializeField] private BattleUiController controller;
         [SerializeField] private float pickRadius = 5f;
 
         private void Start()
@@ -23,7 +23,7 @@ namespace Game.UnityBridge.UI
             if (worldCamera == null) worldCamera = Camera.main;
             if (driver == null) driver = FindObjectOfType<BattleDriver>();
             if (viewRoot == null) viewRoot = FindObjectOfType<BattleViewRoot>();
-            if (controller == null) controller = FindObjectOfType<BuildController>();
+            if (controller == null) controller = FindObjectOfType<BattleUiController>();
         }
 
         private void Update()
@@ -56,6 +56,7 @@ namespace Game.UnityBridge.UI
             }
 
             if (bestIndex >= 0) controller.HandleSlotClicked(bestIndex);
+            else controller.HandleBackgroundClicked();
         }
     }
 }

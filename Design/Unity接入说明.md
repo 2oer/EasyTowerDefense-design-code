@@ -1,5 +1,7 @@
 # Unity 接入说明
 
+> 当前版本:**v0.01early**(六塔全升级树 + 144 个升级节点)
+
 本文件说明如何把 `Assets/Scripts` 的纯逻辑层接入 Unity 场景。
 仓库现在已经是**可直接用 Unity 打开的工程骨架**（含 `ProjectSettings/ProjectVersion.txt`、
 `Packages/manifest.json`），场景、预制体与 UGUI 由编辑器脚本一键生成，不需要手动拖引用。
@@ -18,9 +20,11 @@
    脚本会自动创建材质、预制体、Canvas、GameRoot，并保存场景到 `Assets/Scenes/Battle.unity`。
 6. **运行**：确认当前场景是 `Battle`，点顶部 **▶ Play**。
 7. **操作**：
-   - 左侧选一张塔卡 → 点战场上的圆形槽位 → 立即建造。
-   - 点已建成的塔 → 右侧出现下一级可选升级，点「升级」消耗金币。
-   - 顶部按钮：暂停 / 速度 ×1→×2→×3。
+   - Play 后先进入**布防阶段**；点顶部「开始交战」才会出兵。
+   - 左键点击战场上的白色圆形空位 → 高亮并弹出建造菜单。
+   - 左键点击已建塔 → 显示射程圈，并弹出「详细数据 / 升级 / 拆除」。
+   - 右键或中键拖动平移，滚轮缩放（默认只显示城墙与下半张地图）。
+   - 顶部按钮：暂停 / 速度 ×1→×2→×5。
 
 如果菜单没有出现，通常是脚本还在编译：等 Console 的编译转圈结束，或点 **Assets → Reimport All**。
 
@@ -62,19 +66,19 @@
 
 ```
 GameRoot                       BattleDriver / BattleViewRoot / BattleViewBinder
-                               AudioService / BattleSlotPicker / BuildController
+                               AudioService / BattleSlotPicker / BattleUiController
 ├─ Vfx                         BattleVfxSink
-├─ Main Camera                 正交,俯视 -Y,viewport 中间 68%
+├─ Main Camera                 正交,俯视 -Y,CameraRig(拖动 / 缩放)
 ├─ World
-│  ├─ Ground                   Plane 80×120
-│  ├─ Base                     基地标记
-│  └─ Slots                    Slot0..3 槽位标记
+│  ├─ Ground                   Plane 64×120(白色)
+│  ├─ Wall                     横跨整张地图的城墙(基地)
+│  └─ Slots                    Slot0..5 白底黑框圆盘
 └─ Canvas                      Screen Space - Overlay (1920×1080 缩放)
-   ├─ HUD                      金币 / 基地 / 波次 / 状态 / 暂停 / 速度
-   ├─ BuildPanel               BuildPanelView + 6 张 TowerCard 预制体
-   ├─ UpgradePanel             UpgradePanelView + UpgradeNode 预制体
+   ├─ HUD                      金币 / 城墙 / 波次 / 状态 / 开始交战 / 暂停 / 速度
    └─ Hint                     操作提示
 ```
+
+所有弹出菜单与确认窗由 `BattleUiController` 在运行时生成(白底 + 黑描边),不再需要左侧建造池。
 
 `BattleDriver` 的 Inspector 参数：
 
@@ -83,15 +87,20 @@ GameRoot                       BattleDriver / BattleViewRoot / BattleViewBinder
 - `maxWaves`：默认 30
 - `seed`：确定性种子（Unity 不支持序列化 `ulong`，内部转 `ulong`）
 - `autoPlay`：`true` = AI 自动建造升级（回归/演示）；`false` = 玩家用 UI 建造
-  （一键生成默认 `false`；想直接看战斗，把它勾上即可）
+  （一键生成默认 `false`）
+- `manualWaveStart`：`true` = 布防阶段等待玩家点「开始交战」（默认开启）
 
 ## 4. 坐标约定
 
-逻辑单位为地图单位（`maps.json` 中 80 × 120）。
+逻辑单位为地图单位（`maps.json` 中 64 × 120）。
 
 - 逻辑 `(x, y)` → 世界 `worldOrigin + (x, 0, y) × unitScale`
-- 默认 `unitScale = 1`，即 1 逻辑单位 = 1 米；地图为 80 × 120 米
-- 基地在 `(40, 8)`，敌人从上方 `spawnY` 随机横向位置向下推进
+- 默认 `unitScale = 1`，即 1 逻辑单位 = 1 米；地图为 64 × 120 米
+- 基地 = `y = 2.5` 的贴地城墙(线稿贴图,不再是有高度的 3D 墙);敌人沿自己竖线直线下行,撞墙即被吸收
+- 出生点从中轴开始向两侧铺开,到边界后回绕中轴继续;可用宽度随波次增长
+- 建造槽位是城墙前的一条直线（`y = 12`，x = 7 / 17 / 27 / 37 / 47 / 57，共 6 个）
+- 射程硬上限 60（`TowerStatsBuilder.MaxRange`），防止后期覆盖整张地图
+- 地图外为淡灰色底,地图四周只有细黑线,底边由城墙贴图接管
 - `BattleViewRoot.ToLogical()` 提供反向换算，供点击拾取使用
 
 ## 5. 资源库约定
@@ -119,15 +128,22 @@ Assets/Audio/Sfx/UI/ui_build.wav / ui_upgrade.wav / ui_slot.wav
 
 - 配置表加载 + 启动期 `ModelValidator` 硬校验
 - 30 Hz 固定步长驱动、暂停、1×/2×/3× 倍速
+- **布防阶段 + 手动开战**：`manualWaveStart = true` 时不会自动出兵，点「开始交战」才进入本波；
+  每波结束回到布防时会清空临时物、补满全塔弹药并收回无人机编队
 - 逻辑 → 视图同步：敌人、塔（炮塔朝向 / 等级点 / 选中）、投射物、地面区域、无人机编队、避雷针
 - 落点特效按 `Mechanic` 派发（`BattleVfxSink`）
-- 玩家建造 / 升级入口：`BattleDriver.TryBuild` / `TryUpgrade` → `BattleSimulation.TryBuildTower` / `TryUpgradeTower`
-- UGUI 面板骨架：金币 / 基地耐久 / 波次 / 暂停 / 倍速、塔卡列表、升级节点列表、槽位点击拾取
+- 玩家建造 / 升级 / 拆除：`BattleDriver.TryBuild` / `TryUpgrade` / `TrySell`（拆除返还：建造价 100% + 升级花费 50%）
+- 升级树：六塔各 24 节点（Lv2/Lv3 三选一、Lv4 两个唯一升级、Lv5/Lv6 分支三选一、Lv7 四终点），共 144 个节点；升级窗按 `requires` 自动列出当前可选项
+- 唯一升级机制：机枪 / 激光的形态词条、迫击炮（空爆 / 破片 / 燃烧 / 低温 / 阵列 / 贯顶内爆）、火箭（蜂窝 / 发射井 / 电浆 / 分裂 / 温压 / 氢弹）、电弧（电容 / 球形闪电 / 裂变 / 引雷针 / 漏电 / 雷电滚滚）、无人机（飓风 / 极光 / 雷暴 / 移动工厂 / 大舰巨炮 / 精装修）
+- 经济：三档难度金币率统一 +10%（简单 1.32 / 普通 1.10 / 困难 0.99），用于轻微提升所有敌人金币掉落
+- 点击交互：空位高亮 + 建造菜单；塔射程圈 + 详细数据 / 升级 / 拆除；确认窗与飘字提示
+- 相机：右键（或中键）拖动平移、滚轮缩放，默认只显示城墙与下半张地图；视野按正交尺寸与宽高比夹取，不会移出地图边界
+- 白色主题：白色地面 / 白色面板、黑色描边；基地为横跨整张地图的城墙
 - 一键生成：材质 / 6 种塔预制体 / 13 种敌人预制体 / 投射物 / 编队 / 区域 / 避雷针 / 特效 / UGUI / 场景
 
 ## 7. 待补
 
-- 具体的 UI 布局、动效与交互反馈（悬停、禁用态、射程预览、拖拽建造）
+- 拖拽建造、悬停高亮等更细的交互反馈
 - 敌人受击 / 死亡、塔开火、投射物飞行的动画与音效挂点
 - 波次预告、结算面板、失败重开流程
 - 美术替换：当前全部为纯色几何体占位；正式资源按第 5 节命名后，在 `AssetCatalog` 里替换预制体即可

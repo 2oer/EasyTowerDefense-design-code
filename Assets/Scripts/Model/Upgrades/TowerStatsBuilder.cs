@@ -6,10 +6,17 @@ namespace Game.Model
     /// <summary>把基础面板与已选升级节点合成为运行时属性。增幅一律乘算。</summary>
     public static class TowerStatsBuilder
     {
+        /// <summary>射程硬上限:防止后期升级覆盖整张地图,导致敌人生成区被完全覆盖。</summary>
+        public const float MaxRange = 60f;
+
         public static TowerRuntimeStats Build(TowerDef def, IReadOnlyList<UpgradeNodeDef> nodes)
         {
             TowerRuntimeStats stats = TowerRuntimeStats.FromDef(def);
-            if (nodes == null) return stats;
+            if (nodes == null)
+            {
+                ClampRange(stats);
+                return stats;
+            }
 
             for (int i = 0; i < nodes.Count; i++)
             {
@@ -17,8 +24,14 @@ namespace Game.Model
             }
 
             if (stats.Continuous) ApplyContinuous(stats);
+            ClampRange(stats);
 
             return stats;
+        }
+
+        private static void ClampRange(TowerRuntimeStats stats)
+        {
+            if (stats.Range > MaxRange) stats.Range = MaxRange;
         }
 
         private static void Apply(TowerRuntimeStats stats, UpgradeNodeDef node)

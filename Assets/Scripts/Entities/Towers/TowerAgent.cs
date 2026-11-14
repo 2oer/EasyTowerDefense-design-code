@@ -148,6 +148,23 @@ namespace Game.Entity
             }
         }
 
+        /// <summary>
+        /// 进入布防阶段时重置:补满弹匣 / 机库库存,清空冷却与出击队列。
+        /// 移动工厂回到停机坪、无人机库收回全部编队后重新待命。
+        /// </summary>
+        public void ResetForDeployment()
+        {
+            Ammo = Stats.Ammo;
+            Cooldown = 0f;
+            ReloadTimer = 0f;
+            LastHitCount = 0;
+
+            DroneReserve = Stats.DroneCapacity;
+            DeployedDrones = 0;
+            DeployTimer = 0f;
+            SquadsDeployed = 0;
+        }
+
         /// <summary>返回本帧是否开火 / 派出编队。</summary>
         public bool Tick(
             float dt,

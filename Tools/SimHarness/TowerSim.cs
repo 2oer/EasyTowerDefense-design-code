@@ -28,29 +28,29 @@ namespace SimHarness
                 {
                     "mortar", new[]
                     {
-                        "mortar_lv2_heavy_charge", "mortar_lv3_arc_calibration", "mortar_lv4_cluster",
-                        "mortar_lv5_fragmentation", "mortar_lv6_napalm", "mortar_lv7_smart_implosion"
+                        "mortar_lv2_heavy_charge", "mortar_lv3_arc_calibration", "mortar_lv4_fragmentation",
+                        "mortar_lv5_quick_load", "mortar_lv6_adv_frag", "mortar_lv7_smart_implosion"
                     }
                 },
                 {
                     "rocket", new[]
                     {
-                        "rocket_lv2_quick_reload", "rocket_lv3_swarm", "rocket_lv4_split_warhead",
-                        "rocket_lv5_plasma_missile", "rocket_lv6_thermobaric", "rocket_lv7_hydrogen"
+                        "rocket_lv2_high_explosive", "rocket_lv3_ammo_expand", "rocket_lv4_missile_silo",
+                        "rocket_lv5_fast_erect", "rocket_lv6_preset_sequence", "rocket_lv7_hydrogen"
                     }
                 },
                 {
                     "tesla", new[]
                     {
-                        "tesla_lv2_high_voltage", "tesla_lv3_capacitor", "tesla_lv4_ball_lightning",
-                        "tesla_lv5_lightning_rod", "tesla_lv6_rolling_thunder", "tesla_lv7_leak_current"
+                        "tesla_lv2_high_voltage", "tesla_lv3_conductor", "tesla_lv4_ball_lightning",
+                        "tesla_lv5_bipolar", "tesla_lv6_overload_core", "tesla_lv7_rolling_thunder"
                     }
                 },
                 {
                     "drone_hangar", new[]
                     {
-                        "drone_lv2_expand", "drone_lv3_refined_ammo", "drone_lv4_mobile_factory",
-                        "drone_lv5_hurricane", "drone_lv6_thunderstorm", "drone_lv7_refined_hangar"
+                        "drone_lv2_expand", "drone_lv3_pipeline", "drone_lv4_mobile_factory",
+                        "drone_lv5_hangar_expand", "drone_lv6_radar_up", "drone_lv7_battleship"
                     }
                 }
             };

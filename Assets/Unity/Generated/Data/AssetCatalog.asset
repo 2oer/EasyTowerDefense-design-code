@@ -1,0 +1,100 @@
+%YAML 1.1
+%TAG !u! tag:yousandi.cn,2023:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fa16af85ded2f6c408534864acf67dd2, type: 3}
+  m_Name: AssetCatalog
+  m_EditorClassIdentifier: 
+  towers:
+  - id: machine_gun
+    icon: {fileID: 0}
+    prefab: {fileID: 419177776265091583, guid: 662f6b05eab058a44a0a2cd2e8ed9114, type: 3}
+    fireSfx: {fileID: 0}
+    upgradeSfx: {fileID: 0}
+  - id: laser
+    icon: {fileID: 0}
+    prefab: {fileID: 6772872319651488210, guid: e1543f4ff66508b4eab66a6e55e01d9d, type: 3}
+    fireSfx: {fileID: 0}
+    upgradeSfx: {fileID: 0}
+  - id: mortar
+    icon: {fileID: 0}
+    prefab: {fileID: 1480678009407579563, guid: 9b50ecf24be4a534db8d9896f87fc690, type: 3}
+    fireSfx: {fileID: 0}
+    upgradeSfx: {fileID: 0}
+  - id: rocket
+    icon: {fileID: 0}
+    prefab: {fileID: 4184202471588491771, guid: 75ebe34599dcc044d997fef846108756, type: 3}
+    fireSfx: {fileID: 0}
+    upgradeSfx: {fileID: 0}
+  - id: tesla
+    icon: {fileID: 0}
+    prefab: {fileID: 3229315555447039869, guid: 1435d14bc4c640242bc9ad94f53b9a98, type: 3}
+    fireSfx: {fileID: 0}
+    upgradeSfx: {fileID: 0}
+  - id: drone_hangar
+    icon: {fileID: 0}
+    prefab: {fileID: 5597757669006052918, guid: 187f9bff879f89c48bc5c0d1af833aa1, type: 3}
+    fireSfx: {fileID: 0}
+    upgradeSfx: {fileID: 0}
+  enemies:
+  - id: worker
+    icon: {fileID: 0}
+    prefab: {fileID: 6768914770182249456, guid: 04e858e0bb05db640b59d4bf792d077b, type: 3}
+    deathSfx: {fileID: 0}
+  - id: hunter
+    icon: {fileID: 0}
+    prefab: {fileID: 7423614110459729686, guid: 2808c703e8bc5b14a9006cb329a27c25, type: 3}
+    deathSfx: {fileID: 0}
+  - id: composite
+    icon: {fileID: 0}
+    prefab: {fileID: 4611986897607410989, guid: 714ecc5c99e19374c84ddd45691cedfc, type: 3}
+    deathSfx: {fileID: 0}
+  - id: shooter
+    icon: {fileID: 0}
+    prefab: {fileID: 1865199811420734581, guid: 3dcc5b82925f37443a457164fb110830, type: 3}
+    deathSfx: {fileID: 0}
+  - id: skirmisher
+    icon: {fileID: 0}
+    prefab: {fileID: 7024378708092537489, guid: bf0f7557ebd8ec24595d241b96dbc92a, type: 3}
+    deathSfx: {fileID: 0}
+  - id: assault
+    icon: {fileID: 0}
+    prefab: {fileID: 2977919693790353834, guid: 89b8b30f03e014b4bbc78d8737a2ec1a, type: 3}
+    deathSfx: {fileID: 0}
+  - id: firepower
+    icon: {fileID: 0}
+    prefab: {fileID: 464026497397260427, guid: 3b114242e1e0d894c81eb815df97e708, type: 3}
+    deathSfx: {fileID: 0}
+  - id: bulwark
+    icon: {fileID: 0}
+    prefab: {fileID: 4323943522955158849, guid: c61749cc0f507a742a933c44eb72a32b, type: 3}
+    deathSfx: {fileID: 0}
+  - id: shield
+    icon: {fileID: 0}
+    prefab: {fileID: 2974237470380257311, guid: d5e5bdcfd7c3732429ae5220758bb2ed, type: 3}
+    deathSfx: {fileID: 0}
+  - id: foundry
+    icon: {fileID: 0}
+    prefab: {fileID: 6387420988401774824, guid: f76f4a7d3b1502a4fb62f1ef63c3f12e, type: 3}
+    deathSfx: {fileID: 0}
+  - id: furnace
+    icon: {fileID: 0}
+    prefab: {fileID: 4433356124861265497, guid: 385ec85ae0a1cba4088b43561e3d49c6, type: 3}
+    deathSfx: {fileID: 0}
+  - id: magnet
+    icon: {fileID: 0}
+    prefab: {fileID: 3306746343690068898, guid: cb702ab0eb94e0b4680e390243437a88, type: 3}
+    deathSfx: {fileID: 0}
+  - id: ironwall
+    icon: {fileID: 0}
+    prefab: {fileID: 7265318129675297127, guid: 27a277bd7b89a2a4d88cb795b5d70035, type: 3}
+    deathSfx: {fileID: 0}
+  projectiles: []
+  uiIcons: []

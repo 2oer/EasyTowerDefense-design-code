@@ -86,6 +86,15 @@ namespace Game.Combat
             set => Drones.SquadConsumed = value;
         }
 
+        /// <summary>只清理场上临时物(投射物 / 区域 / 避雷针 / 编队),保留敌人视图。</summary>
+        public void ClearTransient()
+        {
+            Projectiles.Clear();
+            Areas.Clear();
+            Rods.Clear();
+            Drones.Clear();
+        }
+
         public void Clear()
         {
             Targets.Clear();

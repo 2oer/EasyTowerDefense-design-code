@@ -2,7 +2,7 @@
   {
     "id": "easy",
     "hpGrowthPerWave": 0.05,
-    "goldRate": 1.2,
+    "goldRate": 1.32,
     "mediumShare": 0.75,
     "largeShare": 0.75,
     "startGold": 400,
@@ -14,7 +14,7 @@
   {
     "id": "normal",
     "hpGrowthPerWave": 0.07,
-    "goldRate": 1.0,
+    "goldRate": 1.1,
     "mediumShare": 1.0,
     "largeShare": 1.0,
     "startGold": 300,
@@ -26,7 +26,7 @@
   {
     "id": "hard",
     "hpGrowthPerWave": 0.10,
-    "goldRate": 0.9,
+    "goldRate": 0.99,
     "mediumShare": 1.30,
     "largeShare": 1.30,
     "startGold": 250,

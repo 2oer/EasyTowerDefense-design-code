@@ -29,6 +29,13 @@ namespace Game.Entity
             return tower;
         }
 
+        /// <summary>移除防御塔(拆除)。槽位映射由 BattleSimulation 负责同步。</summary>
+        public bool RemoveTower(TowerAgent tower)
+        {
+            if (tower == null) return false;
+            return Towers.Remove(tower);
+        }
+
         /// <summary>移除所有已死亡敌人,返回被移除的数量。</summary>
         public int PruneDeadEnemies()
         {

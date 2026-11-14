@@ -42,6 +42,14 @@ namespace Game.UnityBridge
 
         private readonly Dictionary<string, List<ProjectileView>> _projectilePools =
             new Dictionary<string, List<ProjectileView>>();
+        private readonly List<AoeRing> _rings = new List<AoeRing>();
+        private Material _ringMaterial;
+
+        private sealed class AoeRing
+        {
+            public LineRenderer Line;
+            public float Age;
+        }
 
         private readonly Dictionary<AreaEffectField, AreaFieldView> _areas =
             new Dictionary<AreaEffectField, AreaFieldView>();
@@ -87,6 +95,7 @@ namespace Game.UnityBridge
             SyncAreas();
             SyncDrones();
             SyncRods();
+            UpdateRings();
         }
 
         // ---- 敌人 --------------------------------------------------------------
@@ -170,6 +179,27 @@ namespace Game.UnityBridge
         {
             IReadOnlyList<TowerAgent> towers = _sim.Towers;
 
+            // 拆除后清掉对应视图(塔索引由 EntityId 分配,不复用)。
+            var stale = new List<int>();
+            foreach (KeyValuePair<int, TowerView> pair in _towers)
+            {
+                bool found = false;
+                for (int i = 0; i < towers.Count; i++)
+                {
+                    if (towers[i].Id.Index == pair.Key) { found = true; break; }
+                }
+                if (!found) stale.Add(pair.Key);
+            }
+
+            for (int i = 0; i < stale.Count; i++)
+            {
+                TowerView view = _towers[stale[i]];
+                view.Release();
+                Destroy(view.gameObject);
+                _towers.Remove(stale[i]);
+                if (_selectedTowerIndex == stale[i]) _selectedTowerIndex = -1;
+            }
+
             for (int i = 0; i < towers.Count; i++)
             {
                 TowerAgent tower = towers[i];
@@ -212,33 +242,18 @@ namespace Game.UnityBridge
         private void SyncProjectiles()
         {
             List<ProjectileRuntime> projectiles = _sim.Combat.Projectiles;
+            var used = new Dictionary<string, int>();
 
             for (int i = 0; i < projectiles.Count; i++)
             {
                 ProjectileRuntime projectile = projectiles[i];
                 string key = projectile.Spec.Mechanic ?? string.Empty;
 
-                List<ProjectileView> pool;
-                if (!_projectilePools.TryGetValue(key, out pool))
-                {
-                    pool = new List<ProjectileView>();
-                    _projectilePools[key] = pool;
-                }
+                int index;
+                used.TryGetValue(key, out index);
 
-                ProjectileView view = null;
-                for (int p = 0; p < pool.Count; p++)
-                {
-                    if (!pool[p].gameObject.activeSelf) { view = pool[p]; break; }
-                }
-                if (view == null)
-                {
-                    GameObject prefab = ResolveProjectilePrefab(key);
-                    if (prefab == null) continue;
-                    GameObject instance = Instantiate(prefab, transform);
-                    view = instance.GetComponent<ProjectileView>();
-                    if (view == null) view = instance.AddComponent<ProjectileView>();
-                    pool.Add(view);
-                }
+                ProjectileView view = GetProjectileView(key, index);
+                if (view == null) continue;
 
                 view.gameObject.SetActive(true);
                 view.Tick(
@@ -246,7 +261,42 @@ namespace Game.UnityBridge
                     ToWorld(projectile.Start),
                     ToWorld(projectile.Position),
                     ToWorld(projectile.TargetPosition));
+
+                used[key] = index + 1;
             }
+
+            // 逻辑层已移除的弹体必须回收,否则会留下"不消失的尾迹"。
+            foreach (KeyValuePair<string, List<ProjectileView>> pair in _projectilePools)
+            {
+                int count;
+                used.TryGetValue(pair.Key, out count);
+                for (int i = count; i < pair.Value.Count; i++)
+                {
+                    pair.Value[i].gameObject.SetActive(false);
+                }
+            }
+        }
+
+        private ProjectileView GetProjectileView(string key, int index)
+        {
+            List<ProjectileView> pool;
+            if (!_projectilePools.TryGetValue(key, out pool))
+            {
+                pool = new List<ProjectileView>();
+                _projectilePools[key] = pool;
+            }
+
+            while (pool.Count <= index)
+            {
+                GameObject prefab = ResolveProjectilePrefab(key);
+                if (prefab == null) return null;
+                GameObject instance = Instantiate(prefab, transform);
+                ProjectileView view = instance.GetComponent<ProjectileView>();
+                if (view == null) view = instance.AddComponent<ProjectileView>();
+                pool.Add(view);
+            }
+
+            return pool[index];
         }
 
         private GameObject ResolveProjectilePrefab(string mechanic)
@@ -407,6 +457,78 @@ namespace Game.UnityBridge
         {
             if (vfxSink != null)
                 vfxSink.Play(projectile.Position, projectile.Spec.Mechanic, projectile.Spec.ExplosionRadius);
+
+            SpawnAoeRing(projectile.Position, projectile.Spec.ExplosionRadius);
+        }
+
+        /// <summary>范围伤害标识:空心圆,短暂停留后淡出。</summary>
+        private void SpawnAoeRing(Vec2 center, float radius)
+        {
+            if (radius < 0.2f) return;
+
+            var go = new GameObject("AoeRing");
+            go.transform.SetParent(transform, false);
+            go.transform.position = ToWorld(center);
+
+            var line = go.AddComponent<LineRenderer>();
+            line.useWorldSpace = false;
+            line.loop = true;
+            line.widthMultiplier = 0.16f;
+            line.positionCount = 48;
+            line.numCapVertices = 2;
+            line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            line.receiveShadows = false;
+            line.material = RingMaterial();
+
+            const int segments = 48;
+            for (int i = 0; i < segments; i++)
+            {
+                float angle = i * Mathf.PI * 2f / segments;
+                line.SetPosition(i, new Vector3(
+                    Mathf.Cos(angle) * radius, 0.12f, Mathf.Sin(angle) * radius));
+            }
+
+            var color = new Color(0.05f, 0.06f, 0.08f, 0.9f);
+            line.startColor = color;
+            line.endColor = color;
+
+            _rings.Add(new AoeRing { Line = line, Age = 0f });
+        }
+
+        private void UpdateRings()
+        {
+            const float hold = 0.08f;
+            const float fade = 0.16f;
+
+            for (int i = _rings.Count - 1; i >= 0; i--)
+            {
+                AoeRing ring = _rings[i];
+                ring.Age += Time.deltaTime;
+
+                float alpha = ring.Age <= hold
+                    ? 0.9f
+                    : Mathf.Clamp01(0.9f * (1f - (ring.Age - hold) / fade));
+
+                var color = new Color(0.05f, 0.06f, 0.08f, alpha);
+                ring.Line.startColor = color;
+                ring.Line.endColor = color;
+
+                if (ring.Age >= hold + fade)
+                {
+                    Destroy(ring.Line.gameObject);
+                    _rings.RemoveAt(i);
+                }
+            }
+        }
+
+        private Material RingMaterial()
+        {
+            if (_ringMaterial != null) return _ringMaterial;
+
+            Shader shader = Shader.Find("Sprites/Default");
+            if (shader == null) shader = Shader.Find("Unlit/Color");
+            _ringMaterial = new Material(shader);
+            return _ringMaterial;
         }
 
         public Vector3 ToWorld(Vec2 position)
@@ -426,13 +548,23 @@ namespace Game.UnityBridge
             foreach (KeyValuePair<int, EnemyView> pair in _activeEnemies) pair.Value.Release();
             _activeEnemies.Clear();
 
-            foreach (KeyValuePair<int, TowerView> pair in _towers) pair.Value.Release();
+            foreach (KeyValuePair<int, TowerView> pair in _towers)
+            {
+                pair.Value.Release();
+                Destroy(pair.Value.gameObject);
+            }
             _towers.Clear();
 
             foreach (KeyValuePair<string, List<ProjectileView>> pair in _projectilePools)
             {
                 for (int i = 0; i < pair.Value.Count; i++) pair.Value[i].gameObject.SetActive(false);
             }
+
+            for (int i = 0; i < _rings.Count; i++)
+            {
+                if (_rings[i].Line != null) Destroy(_rings[i].Line.gameObject);
+            }
+            _rings.Clear();
 
             foreach (KeyValuePair<AreaEffectField, AreaFieldView> pair in _areas) pair.Value.Release();
             _areas.Clear();

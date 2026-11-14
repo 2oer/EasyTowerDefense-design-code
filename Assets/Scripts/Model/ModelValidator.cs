@@ -78,7 +78,7 @@ namespace Game.Model
                 MapDef m = db.Maps[i];
                 if (m.Width <= 0f || m.Height <= 0f) throw new ModelValidationException(m.Id + ": 地图尺寸非法");
                 if (m.BaseMaxHp <= 0f) throw new ModelValidationException(m.Id + ": baseMaxHp 必须 > 0");
-                if (m.Slots.Count > 4) throw new ModelValidationException(m.Id + ": 防御塔空位不得超过 4 个");
+                if (m.Slots.Count > 8) throw new ModelValidationException(m.Id + ": 防御塔空位不得超过 8 个");
                 for (int s = 0; s < m.Slots.Count; s++)
                 {
                     SlotDef slot = m.Slots[s];

@@ -29,7 +29,7 @@ namespace Game.Battle
 
         private readonly List<string> _buildOrder = new List<string>
         {
-            "laser", "machine_gun", "machine_gun", "laser"
+            "laser", "machine_gun", "machine_gun", "laser", "machine_gun", "laser"
         };
 
         /// <summary>槽位 → 塔索引。玩家接管建造时也走这张表,避免重复占位。</summary>
@@ -61,9 +61,11 @@ namespace Game.Battle
         private int _builtCount;
 
         public BattleSimulation(ModelDatabase db, string difficultyId, string mapId, ulong seed,
-            float baseMaxHpOverride = 0f, string laserBranch = "focus", bool autoPlay = true)
+            float baseMaxHpOverride = 0f, string laserBranch = "focus", bool autoPlay = true,
+            bool manualWaveStart = false)
         {
             AutoPlay = autoPlay;
+            ManualWaveStart = manualWaveStart;
             _laserPath = string.Equals(laserBranch, "sweep", StringComparison.OrdinalIgnoreCase)
                 ? LaserSweepPath
                 : LaserFocusPath;
@@ -79,6 +81,7 @@ namespace Game.Battle
             _map = map;
             _rng = new Rng(seed);
             _director = new WaveDirector(db, difficulty, map, _rng);
+            _director.ManualStart = manualWaveStart;
             _economy = new EconomySystem(difficulty);
             _upgrades = new UpgradeService(db, _economy);
             _combat = new CombatWorld(db.Effects);
@@ -118,8 +121,17 @@ namespace Game.Battle
         /// </summary>
         public bool AutoPlay { get; set; } = true;
 
+        /// <summary>true = 每波开始前停在布防阶段,由玩家调用 StartNextWave()。</summary>
+        public bool ManualWaveStart { get; }
+
+        /// <summary>当前是否在等待玩家点击"开始交战"。</summary>
+        public bool AwaitingWaveStart => _director.AwaitingStart;
+
         public IReadOnlyList<SlotDef> Slots => _map.Slots;
         public bool InPrep => _director.InPrep;
+
+        /// <summary>指定波次是否为大型敌人波(每 5 波)。</summary>
+        public bool IsLargeWave(int wave) => _director.IsLargeWave(wave);
 
         public IReadOnlyList<EnemyRuntime> Enemies => _world.Enemies;
         public IReadOnlyList<TowerAgent> Towers => _world.Towers;
@@ -127,14 +139,34 @@ namespace Game.Battle
 
         private void OnSquadConsumed(int towerIndex, int drones)
         {
-            if (towerIndex < 0 || towerIndex >= _world.Towers.Count) return;
-            _world.Towers[towerIndex].OnSquadConsumed(drones);
+            TowerAgent? tower = FindTowerById(towerIndex);
+            if (tower != null) tower.OnSquadConsumed(drones);
+        }
+
+        private TowerAgent? FindTowerById(int towerIndex)
+        {
+            for (int i = 0; i < _world.Towers.Count; i++)
+            {
+                if (_world.Towers[i].Id.Index == towerIndex) return _world.Towers[i];
+            }
+            return null;
         }
 
         public void Begin(int maxWaves)
         {
             if (maxWaves <= 0) throw new ArgumentOutOfRangeException(nameof(maxWaves));
             _director.Begin(maxWaves);
+            ResetForDeployment();
+        }
+
+        /// <summary>布防阶段:清掉场上临时物,重装所有塔并收回无人机编队。</summary>
+        private void ResetForDeployment()
+        {
+            _combat.ClearTransient();
+            for (int i = 0; i < _world.Towers.Count; i++)
+            {
+                _world.Towers[i].ResetForDeployment();
+            }
         }
 
         public void Step()
@@ -177,26 +209,30 @@ namespace Game.Battle
 
             _combat.Tick(Dt);
 
-            var basePosition = new Vec2(_map.BaseX, _map.BaseY);
-            for (int i = 0; i < _world.Enemies.Count; i++)
+            for (int i = _world.Enemies.Count - 1; i >= 0; i--)
             {
                 EnemyRuntime enemy = _world.Enemies[i];
                 if (!enemy.Alive) continue;
 
                 enemy.TickBlock(Dt);
-                if (enemy.ReachedBase)
+
+                // 直线下行:每只敌人朝"自己正下方的城墙"走,不再向中心点汇集。
+                if (!enemy.ReachedBase)
                 {
-                    BaseHp -= enemy.TickMelee(Dt);
+                    Vec2 wallTarget = new Vec2(enemy.Position.X, _map.BaseY);
+                    enemy.TickMovement(Dt, wallTarget);
                 }
-                else
-                {
-                    enemy.TickMovement(Dt, basePosition);
-                    if (enemy.ReachedBase)
-                    {
-                        Leaks++;
-                        WaveLeaks++;
-                    }
-                }
+
+                if (!enemy.ReachedBase) continue;
+
+                // 撞墙即被城墙吸收:一次性扣血后离场(不给赏金),避免贴墙敌人无限啃基地。
+                Leaks++;
+                WaveLeaks++;
+                float damage = enemy.Hp * enemy.Def.BodyCoef;
+                float cap = BaseMaxHp * 0.25f;
+                if (damage > cap) damage = cap;
+                BaseHp -= damage;
+                _world.Enemies.RemoveAt(i);
             }
 
             if (BaseHp < 0f) BaseHp = 0f;
@@ -208,6 +244,9 @@ namespace Game.Battle
                 WaveGold += _economy.AwardWaveClear(_db.Waves.WaveClearGold);
                 _economy.AwardWaveMeta(completedWave, _director.IsLargeWave(completedWave));
                 OnWaveEnd?.Invoke(completedWave, WaveKills, WaveLeaks, WaveGold);
+
+                // 进入下一波布防:重装防御塔、回收无人机编队。
+                ResetForDeployment();
             }
 
             if (BaseHp <= 0f)
@@ -264,7 +303,10 @@ namespace Game.Battle
             _combat.Targets.AddRange(_targetBuffer);
         }
 
-        /// <summary>出生线 = 固定塔最远射程 + 缓冲,随射程成长实时外移。</summary>
+        /// <summary>
+        /// 出生线 = 固定塔最远射程 + 缓冲;城墙改版后额外保证至少一段固定行进距离,
+        /// 避免敌人贴脸刷新导致塔的输出窗口过短。
+        /// </summary>
         private float ResolveSpawnY()
         {
             float maxEdge = 0f;
@@ -276,6 +318,9 @@ namespace Game.Battle
             }
 
             float y = maxEdge > 0f ? maxEdge + 4f : _map.Height - 2f;
+
+            float minimum = _map.Height - 22f;
+            if (y < minimum) y = minimum;
             if (y > _map.Height - 2f) y = _map.Height - 2f;
             return y;
         }
@@ -409,25 +454,99 @@ namespace Game.Battle
 
         public int UpgradeCostOf(int towerIndex, string nodeId)
         {
-            if (towerIndex < 0 || towerIndex >= _world.Towers.Count) return 0;
+            TowerAgent? tower = FindTowerById(towerIndex);
+            if (tower == null) return 0;
             UpgradeNodeDef? node = _db.FindUpgrade(nodeId);
-            return node == null ? 0 : _upgrades.Cost(_world.Towers[towerIndex].Def, node);
+            return node == null ? 0 : _upgrades.Cost(tower.Def, node);
         }
 
         public bool CanApplyUpgrade(int towerIndex, string nodeId)
         {
-            if (towerIndex < 0 || towerIndex >= _world.Towers.Count) return false;
+            TowerAgent? tower = FindTowerById(towerIndex);
+            if (tower == null) return false;
             UpgradeNodeDef? node = _db.FindUpgrade(nodeId);
-            return node != null && _upgrades.CanApply(_world.Towers[towerIndex], node);
+            return node != null && _upgrades.CanApply(tower, node);
         }
 
         /// <summary>应用升级;成功时通过 OnUpgrade 广播,便于表现层播特效 / 音效。</summary>
         public bool TryUpgradeTower(int towerIndex, string nodeId, out int cost)
         {
             cost = 0;
-            if (towerIndex < 0 || towerIndex >= _world.Towers.Count) return false;
-            if (!_upgrades.TryApply(_world.Towers[towerIndex], nodeId, out cost)) return false;
+            TowerAgent? tower = FindTowerById(towerIndex);
+            if (tower == null) return false;
+            if (!_upgrades.TryApply(tower, nodeId, out cost)) return false;
             OnUpgrade?.Invoke(towerIndex, nodeId, cost);
+            return true;
+        }
+
+        // ---- 波次控制 / 拆除 ---------------------------------------------------
+
+        /// <summary>玩家点击"开始交战";仅在布防阶段有效。</summary>
+        public bool StartNextWave() => _director.StartWaveNow();
+
+        /// <summary>建造费用全额返还。</summary>
+        public const float BuildRefundRate = 1.0f;
+
+        /// <summary>升级费用返还 50%。</summary>
+        public const float UpgradeRefundRate = 0.5f;
+
+        /// <summary>某座塔的累计投入(建造价 + 已购升级)。</summary>
+        public int TowerInvested(int towerIndex)
+        {
+            TowerAgent? tower = FindTowerById(towerIndex);
+            if (tower == null) return 0;
+
+            int total = tower.Def.Price;
+            for (int i = 0; i < tower.Upgrades.Count; i++)
+            {
+                total += _upgrades.Cost(tower.Def, tower.Upgrades[i]);
+            }
+            return total;
+        }
+
+        /// <summary>某座塔已购升级的累计花费。</summary>
+        public int TowerUpgradeSpent(int towerIndex)
+        {
+            TowerAgent? tower = FindTowerById(towerIndex);
+            if (tower == null) return 0;
+
+            int total = 0;
+            for (int i = 0; i < tower.Upgrades.Count; i++)
+            {
+                total += _upgrades.Cost(tower.Def, tower.Upgrades[i]);
+            }
+            return total;
+        }
+
+        /// <summary>拆除返还 = 建造价 ×100% + 升级花费 ×50%(四舍五入)。</summary>
+        public int SellRefund(int towerIndex)
+        {
+            TowerAgent? tower = FindTowerById(towerIndex);
+            if (tower == null) return 0;
+
+            float build = tower.Def.Price * BuildRefundRate;
+            float upgrade = TowerUpgradeSpent(towerIndex) * UpgradeRefundRate;
+            return (int)Math.Round(build + upgrade, MidpointRounding.AwayFromZero);
+        }
+
+        /// <summary>拆除防御塔并返还金币;槽位随即变为空位。</summary>
+        public bool TrySellTower(int towerIndex, out int refund)
+        {
+            refund = 0;
+            TowerAgent? tower = FindTowerById(towerIndex);
+            if (tower == null || Finished) return false;
+
+            refund = SellRefund(towerIndex);
+            if (!_world.RemoveTower(tower)) return false;
+
+            int slot = -1;
+            foreach (KeyValuePair<int, int> pair in _slotToTower)
+            {
+                if (pair.Value == towerIndex) { slot = pair.Key; break; }
+            }
+            if (slot >= 0) _slotToTower.Remove(slot);
+
+            _economy.AddGold(refund);
             return true;
         }
     }

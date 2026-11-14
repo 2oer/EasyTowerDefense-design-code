@@ -163,6 +163,11 @@ namespace Game.Combat
                 return;
             }
 
+            if (stats.Mechanic == TowerMechanics.Battleship)
+            {
+                TickPositron(squad, targets, dt);
+            }
+
             IAoETarget? inRange = FindNearest(targets, squad.Position, stats.DroneRange);
             if (inRange != null)
             {
@@ -296,6 +301,37 @@ namespace Game.Combat
             int index = _squads.IndexOf(squad);
             if (index >= 0) _squads.RemoveAt(index);
             SquadConsumed?.Invoke(squad.TowerIndex, squad.Alive);
+        }
+
+        // ---- 大舰巨炮:阳电子炮 -------------------------------------------------
+
+        /// <summary>
+        /// 阳电子炮:每 4 s 对本体 30 距离内的最近目标打一发高穿甲能量束,
+        /// 共 8 发,只有在移动工厂返回停机坪整备时才补满。
+        /// </summary>
+        private void TickPositron(DroneSquad squad, IReadOnlyList<IAoETarget> targets, float dt)
+        {
+            if (squad.PositronAmmo <= 0) return;
+
+            squad.PositronTimer -= dt;
+            if (squad.PositronTimer > 0f) return;
+
+            IAoETarget? victim = FindNearest(targets, squad.CarrierPosition, 30f);
+            if (victim == null) return;
+
+            squad.PositronTimer = 4f;
+            squad.PositronAmmo--;
+
+            var packet = new DamagePacket
+            {
+                Amount = 1120f,
+                Type = DamageType.Energy,
+                Pierce = ArmorPierce.High,
+                BlockForce = 10f,
+                Beam = true,
+                Source = new EntityId(squad.TowerIndex, 0)
+            };
+            ApplyTo(victim, packet);
         }
 
         // ---- 雷暴:矩形覆盖 + 按距离投弹 ---------------------------------------

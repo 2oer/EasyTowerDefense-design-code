@@ -320,7 +320,7 @@ namespace SimHarness
                 ok &= Check("电磁反器材 射速 1.8", stats.FireRate, 1.8f);
                 ok &= Check("电磁反器材 弹匣 10", stats.Ammo, 10f);
                 ok &= Check("电磁反器材 换弹 0.54", stats.ReloadTime, 0.54f);
-                ok &= Check("电磁反器材 射程 33.75", stats.Range, 33.75f);
+                ok &= Check("电磁反器材 射程 36.45", stats.Range, 36.45f);
                 ok &= Check("电磁反器材 留存 10", stats.Retention, 10f);
                 ok &= Check("电磁反器材 高级穿甲", stats.Pierce == ArmorPierce.High ? 1f : 0f, 1f);
                 ok &= Check("电磁反器材 集中策略", stats.Strategy == TowerStrategy.Focus ? 1f : 0f, 1f);
@@ -329,7 +329,7 @@ namespace SimHarness
             }
 
             Console.WriteLine("[selftest] 升级节点总数 = " + db.Upgrades.Count);
-            ok &= Check("升级节点共 72 个(机枪/激光/迫击炮/火箭/电弧/无人机)", db.Upgrades.Count, 72f);
+            ok &= Check("升级节点共 144 个(六塔 × 24 节点)", db.Upgrades.Count, 144f);
 
             UpgradeNodeDef? laser2 = db.FindUpgrade("laser_lv2_efficient_cool");
             UpgradeNodeDef? laser3 = db.FindUpgrade("laser_lv3_stable_circuit");
@@ -355,7 +355,7 @@ namespace SimHarness
                 ok &= Check("扫荡透镜 单束伤害 = Lv3 × 0.5", sweep.Damage, lv3Stats.Damage * 0.5f, 1e-3f);
             }
 
-            // ---- 四塔数据与整树构建 ---------------------------------------------
+            // ---- 四塔基础属性 --------------------------------------------------------
             TowerDef? mortar = db.FindTower("mortar");
             TowerDef? rocket = db.FindTower("rocket");
             TowerDef? tesla = db.FindTower("tesla");
@@ -367,69 +367,268 @@ namespace SimHarness
             ok &= Check("无人机 编队 6", drone?.DroneSquad ?? -1f, 6f);
             ok &= Check("无人机 库存 48", drone?.DroneCapacity ?? -1f, 48f);
 
-            var paths = new Dictionary<string, string[]>
+            // ---- 六塔全树:每塔 24 节点(Lv2/Lv3 各 3、Lv4 2、Lv5/Lv6 各 6、Lv7 4)---
+            string[] treeTowers = { "machine_gun", "laser", "mortar", "rocket", "tesla", "drone_hangar" };
+            int[] levelCounts = { 3, 3, 2, 6, 6, 4 };
+
+            for (int t = 0; t < treeTowers.Length; t++)
             {
+                string towerId = treeTowers[t];
+                int total = 0;
+                bool shapeOk = true;
+                for (int lv = 2; lv <= 7; lv++)
                 {
-                    "mortar", new[]
+                    int count = 0;
+                    for (int i = 0; i < db.Upgrades.Count; i++)
                     {
-                        "mortar_lv2_heavy_charge", "mortar_lv3_arc_calibration", "mortar_lv4_cluster",
-                        "mortar_lv5_fragmentation", "mortar_lv6_napalm", "mortar_lv7_smart_implosion"
+                        UpgradeNodeDef node = db.Upgrades[i];
+                        if (node.TowerId == towerId && node.Level == lv) count++;
                     }
-                },
-                {
-                    "rocket", new[]
-                    {
-                        "rocket_lv2_quick_reload", "rocket_lv3_swarm", "rocket_lv4_split_warhead",
-                        "rocket_lv5_plasma_missile", "rocket_lv6_thermobaric", "rocket_lv7_hydrogen"
-                    }
-                },
-                {
-                    "tesla", new[]
-                    {
-                        "tesla_lv2_high_voltage", "tesla_lv3_capacitor", "tesla_lv4_ball_lightning",
-                        "tesla_lv5_lightning_rod", "tesla_lv6_rolling_thunder", "tesla_lv7_leak_current"
-                    }
-                },
-                {
-                    "drone_hangar", new[]
-                    {
-                        "drone_lv2_expand", "drone_lv3_refined_ammo", "drone_lv4_mobile_factory",
-                        "drone_lv5_hurricane", "drone_lv6_thunderstorm", "drone_lv7_refined_hangar"
-                    }
+                    total += count;
+                    if (count != levelCounts[lv - 2]) shapeOk = false;
                 }
-            };
+                ok &= Check(towerId + " 升级树形状 3/3/2/6/6/4", shapeOk ? 1f : 0f, 1f);
+                ok &= Check(towerId + " 升级节点共 24", total, 24f);
+            }
 
-            var expectedMechanic = new Dictionary<string, string>
+            // ---- 每个 Lv7 终点走一条完整路径,校验机制与关键数值 ----------------
+            var branchEnds = new (string Tower, string[] Path, string Mechanic)[]
             {
-                { "mortar", "smart_implosion" },
-                { "rocket", "hydrogen" },
-                { "tesla", "leak_current" },
-                { "drone_hangar", "refined_hangar" }
-            };
-
-            foreach (KeyValuePair<string, string[]> entry in paths)
-            {
-                TowerDef? towerDef = db.FindTower(entry.Key);
-                if (towerDef == null)
+                ("mortar", new[]
                 {
-                    ok &= Check("塔定义存在 " + entry.Key, 0f, 1f);
+                    "mortar_lv2_heavy_charge", "mortar_lv3_arc_calibration", "mortar_lv4_cluster",
+                    "mortar_lv5_fast_drop", "mortar_lv6_light_body", "mortar_lv7_napalm"
+                }, TowerMechanics.Napalm),
+                ("mortar", new[]
+                {
+                    "mortar_lv2_quick_loader", "mortar_lv3_stabilizer_fins", "mortar_lv4_cluster",
+                    "mortar_lv5_fast_drop", "mortar_lv6_light_body", "mortar_lv7_cryo"
+                }, TowerMechanics.Cryo),
+                ("mortar", new[]
+                {
+                    "mortar_lv2_heavy_charge", "mortar_lv3_stabilizer_fins", "mortar_lv4_fragmentation",
+                    "mortar_lv5_quick_load", "mortar_lv6_adv_frag", "mortar_lv7_array_battery"
+                }, TowerMechanics.ArrayBattery),
+                ("mortar", new[]
+                {
+                    "mortar_lv2_heavy_charge", "mortar_lv3_arc_calibration", "mortar_lv4_fragmentation",
+                    "mortar_lv5_main_charge", "mortar_lv6_adv_frag", "mortar_lv7_smart_implosion"
+                }, TowerMechanics.SmartImplosion),
+                ("rocket", new[]
+                {
+                    "rocket_lv2_quick_reload", "rocket_lv3_dual_rail", "rocket_lv4_cellular_hive",
+                    "rocket_lv5_fast_cycle", "rocket_lv6_dense_barrage", "rocket_lv7_plasma_missile"
+                }, TowerMechanics.PlasmaMissile),
+                ("rocket", new[]
+                {
+                    "rocket_lv2_quick_reload", "rocket_lv3_dual_rail", "rocket_lv4_cellular_hive",
+                    "rocket_lv5_fast_cycle", "rocket_lv6_dense_barrage", "rocket_lv7_split_warhead"
+                }, TowerMechanics.SplitWarhead),
+                ("rocket", new[]
+                {
+                    "rocket_lv2_high_explosive", "rocket_lv3_ammo_expand", "rocket_lv4_missile_silo",
+                    "rocket_lv5_warhead", "rocket_lv6_big_charge", "rocket_lv7_thermobaric"
+                }, TowerMechanics.Thermobaric),
+                ("rocket", new[]
+                {
+                    "rocket_lv2_high_explosive", "rocket_lv3_ammo_expand", "rocket_lv4_missile_silo",
+                    "rocket_lv5_fast_erect", "rocket_lv6_preset_sequence", "rocket_lv7_hydrogen"
+                }, TowerMechanics.Hydrogen),
+                ("tesla", new[]
+                {
+                    "tesla_lv2_high_voltage", "tesla_lv3_conductor", "tesla_lv4_capacitor",
+                    "tesla_lv5_cap_expand", "tesla_lv6_resonator", "tesla_lv7_fission"
+                }, TowerMechanics.Fission),
+                ("tesla", new[]
+                {
+                    "tesla_lv2_high_voltage", "tesla_lv3_conductor", "tesla_lv4_capacitor",
+                    "tesla_lv5_overload", "tesla_lv6_high_breakdown", "tesla_lv7_lightning_rod"
+                }, TowerMechanics.Rod),
+                ("tesla", new[]
+                {
+                    "tesla_lv2_fast_discharge", "tesla_lv3_fast_electrode", "tesla_lv4_ball_lightning",
+                    "tesla_lv5_bipolar", "tesla_lv6_overload_core", "tesla_lv7_leak_current"
+                }, TowerMechanics.LeakCurrent),
+                ("tesla", new[]
+                {
+                    "tesla_lv2_fast_discharge", "tesla_lv3_fast_electrode", "tesla_lv4_ball_lightning",
+                    "tesla_lv5_bipolar", "tesla_lv6_overload_core", "tesla_lv7_rolling_thunder"
+                }, TowerMechanics.RollingThunder),
+                ("drone_hangar", new[]
+                {
+                    "drone_lv2_reinforced_body", "drone_lv3_dense_deploy", "drone_lv4_hurricane",
+                    "drone_lv5_firepower", "drone_lv6_sensor_pod", "drone_lv7_aurora"
+                }, TowerMechanics.Aurora),
+                ("drone_hangar", new[]
+                {
+                    "drone_lv2_reinforced_body", "drone_lv3_dense_deploy", "drone_lv4_hurricane",
+                    "drone_lv5_firepower", "drone_lv6_sensor_pod", "drone_lv7_thunderstorm"
+                }, TowerMechanics.Thunderstorm),
+                ("drone_hangar", new[]
+                {
+                    "drone_lv2_expand", "drone_lv3_pipeline", "drone_lv4_mobile_factory",
+                    "drone_lv5_hangar_expand", "drone_lv6_radar_up", "drone_lv7_battleship"
+                }, TowerMechanics.Battleship),
+                ("drone_hangar", new[]
+                {
+                    "drone_lv2_expand", "drone_lv3_pipeline", "drone_lv4_mobile_factory",
+                    "drone_lv5_hangar_expand", "drone_lv6_radar_up", "drone_lv7_refined_hangar"
+                }, TowerMechanics.RefinedHangar)
+            };
+
+            for (int b = 0; b < branchEnds.Length; b++)
+            {
+                (string towerId, string[] path, string mechanic) = branchEnds[b];
+                TowerDef? def = db.FindTower(towerId);
+                if (def == null)
+                {
+                    ok &= Check("塔定义存在 " + towerId, 0f, 1f);
                     continue;
                 }
 
                 var nodes = new List<UpgradeNodeDef>();
-                for (int i = 0; i < entry.Value.Length; i++)
+                for (int i = 0; i < path.Length; i++)
                 {
-                    UpgradeNodeDef? node = db.FindUpgrade(entry.Value[i]);
-                    if (node == null) continue;
-                    nodes.Add(node);
+                    UpgradeNodeDef? node = db.FindUpgrade(path[i]);
+                    if (node != null) nodes.Add(node);
                 }
 
-                ok &= Check(entry.Key + " 升级链完整 (6)", nodes.Count, 6f);
-                TowerRuntimeStats full = TowerStatsBuilder.Build(towerDef, nodes);
-                string expected = expectedMechanic[entry.Key];
-                ok &= Check(entry.Key + " Lv7 机制 = " + expected,
-                    string.Equals(full.Mechanic, expected, StringComparison.Ordinal) ? 1f : 0f, 1f);
+                string endId = path[path.Length - 1];
+                ok &= Check(endId + " 路径 6 级完整", nodes.Count, 6f);
+                TowerRuntimeStats stats = TowerStatsBuilder.Build(def, nodes);
+                ok &= Check(endId + " 机制 = " + mechanic,
+                    string.Equals(stats.Mechanic, mechanic, StringComparison.Ordinal) ? 1f : 0f, 1f);
             }
+
+            var siloNodes = new List<UpgradeNodeDef>();
+            foreach (string id in new[]
+            {
+                "rocket_lv2_high_explosive", "rocket_lv3_ammo_expand", "rocket_lv4_missile_silo"
+            })
+            {
+                UpgradeNodeDef? node = db.FindUpgrade(id);
+                if (node != null) siloNodes.Add(node);
+            }
+            TowerRuntimeStats silo = TowerStatsBuilder.Build(db.FindTower("rocket")!, siloNodes);
+            ok &= Check("发射井 弹仓 1", silo.Ammo, 1f);
+            ok &= Check("发射井 重装 20 s", silo.ReloadTime, 20f);
+            ok &= Check("发射井 爆炸半径 40", silo.ExplosionRadius, 40f);
+
+            var hiveNodes = new List<UpgradeNodeDef>();
+            foreach (string id in new[]
+            {
+                "rocket_lv2_quick_reload", "rocket_lv3_dual_rail", "rocket_lv4_cellular_hive"
+            })
+            {
+                UpgradeNodeDef? node = db.FindUpgrade(id);
+                if (node != null) hiveNodes.Add(node);
+            }
+            TowerRuntimeStats hive = TowerStatsBuilder.Build(db.FindTower("rocket")!, hiveNodes);
+            ok &= Check("蜂窝 齐射 4", hive.Salvo, 4f);
+            ok &= Check("蜂窝 每发 8 子弹头", hive.SubCount, 8f);
+
+            // ---- 布防阶段 / 手动开战 / 生成位置 / 拆除 -----------------------------
+            var manual = new BattleSimulation(db, "normal", "standard", 12345UL, 0f, "focus", false, true);
+            manual.Begin(30);
+            ok &= Check("布防阶段停在等待开战", manual.AwaitingWaveStart ? 1f : 0f, 1f);
+            ok &= Check("布防阶段波次仍为 1", manual.Wave, 1f);
+
+            for (int i = 0; i < 120; i++) manual.Step();
+            ok &= Check("等待开战 4 秒不刷怪", manual.Spawned, 0f);
+            ok &= Check("等待开战 4 秒无敌人", manual.Enemies.Count, 0f);
+            ok &= Check("布防阶段不自动建塔", manual.Towers.Count, 0f);
+
+            ok &= Check("手动开战成功", manual.StartNextWave() ? 1f : 0f, 1f);
+            ok &= Check("重复开战被拒绝", manual.StartNextWave() ? 0f : 1f, 1f);
+
+            for (int i = 0; i < 90; i++) manual.Step();
+            ok &= Check("开战后开始刷怪", manual.Spawned > 0 ? 1f : 0f, 1f);
+            if (manual.Enemies.Count > 0)
+            {
+                ok &= Check("首个敌人在中轴附近生成",
+                    Math.Abs(manual.Enemies[0].Position.X - 32f) <= 3f ? 1f : 0f, 1f);
+            }
+
+            var sellSim = new BattleSimulation(db, "normal", "standard", 12345UL, 0f, "focus", false, true);
+            sellSim.Begin(30);
+            ok &= Check("玩家建造成功", sellSim.TryBuildTower("machine_gun", 0) ? 1f : 0f, 1f);
+            ok &= Check("建造后槽位被占用", sellSim.IsSlotOccupied(0) ? 1f : 0f, 1f);
+
+            int towerIndex = sellSim.TowerIndexAtSlot(0);
+            ok &= Check("槽位映射到塔索引", towerIndex >= 0 ? 1f : 0f, 1f);
+            ok &= Check("累计投入 = 建造价", sellSim.TowerInvested(towerIndex), 100f);
+            ok &= Check("拆除返还 = 建造价 100%", sellSim.SellRefund(towerIndex), 100f);
+
+            int goldBeforeSell = sellSim.Gold;
+            int refundGot;
+            ok &= Check("拆除成功", sellSim.TrySellTower(towerIndex, out refundGot) ? 1f : 0f, 1f);
+            ok &= Check("拆除返还入账", sellSim.Gold - goldBeforeSell, 100f);
+            ok &= Check("拆除后槽位空出", sellSim.IsSlotOccupied(0) ? 0f : 1f, 1f);
+            ok &= Check("拆除后塔列表为空", sellSim.Towers.Count, 0f);
+
+            // 升级后再拆除:投入与返还必须与实付金币一致。
+            var refundSim = new BattleSimulation(db, "normal", "standard", 12345UL, 0f, "focus", false, true);
+            refundSim.Begin(30);
+            refundSim.TryBuildTower("machine_gun", 0);
+            int upgradedTower = refundSim.TowerIndexAtSlot(0);
+            int paidCost;
+            refundSim.TryUpgradeTower(upgradedTower, "mg_lv2_quick_feed", out paidCost);
+            ok &= Check("拆除投入 = 建造 + 升级", refundSim.TowerInvested(upgradedTower), 100f + paidCost);
+
+            int expectedRefund = 100 + (int)Math.Round(paidCost * 0.5f,
+                MidpointRounding.AwayFromZero);
+            ok &= Check("升级后返还 = 建造 100% + 升级 50%",
+                refundSim.SellRefund(upgradedTower), expectedRefund);
+
+            int beforeSell2 = refundSim.Gold;
+            int got2;
+            refundSim.TrySellTower(upgradedTower, out got2);
+            ok &= Check("升级后拆除到账 = 返还", refundSim.Gold - beforeSell2, expectedRefund);
+
+            ok &= Check("大型波标记 = 5/10 的倍数",
+                sellSim.IsLargeWave(5) && sellSim.IsLargeWave(10) && !sellSim.IsLargeWave(7) ? 1f : 0f, 1f);
+
+            // 大型敌人:赏金上调,且生成位置尽量靠近中轴。
+            List<EnemyDef> largeDefs = db.EnemiesOfSize(EnemySize.Large);
+            bool bountyOk = largeDefs.Count > 0;
+            for (int i = 0; i < largeDefs.Count; i++)
+            {
+                if (largeDefs[i].Bounty < 50) bountyOk = false;
+            }
+            ok &= Check("大型敌人赏金 ≥ 50", bountyOk ? 1f : 0f, 1f);
+
+            float centerX = db.Maps[0].Width * 0.5f;
+            var director = new WaveDirector(db, db.FindDifficulty("normal")!, db.Maps[0],
+                new Rng(12345UL));
+            director.ManualStart = true;
+            director.Begin(30);
+
+            int guard = 0;
+            while (director.Wave < 10 && guard++ < 200000)
+            {
+                if (director.AwaitingStart) director.StartWaveNow();
+                director.Tick(0.1f, 0, 2.5f);
+                director.PendingSpawns.Clear();
+            }
+
+            bool sawLarge = false;
+            bool largeNearCenter = true;
+            guard = 0;
+            while (director.Wave == 10 && guard++ < 200000)
+            {
+                if (director.AwaitingStart) director.StartWaveNow();
+                director.Tick(0.1f, 0, 2.5f);
+                for (int i = 0; i < director.PendingSpawns.Count; i++)
+                {
+                    SpawnRequest req = director.PendingSpawns[i];
+                    if (req.Def.Size != EnemySize.Large) continue;
+                    sawLarge = true;
+                    if (Math.Abs(req.Position.X - centerX) > 10f) largeNearCenter = false;
+                }
+                director.PendingSpawns.Clear();
+            }
+            ok &= Check("第 10 波实际生成大型敌人", sawLarge ? 1f : 0f, 1f);
+            ok &= Check("大型敌人生成靠近中轴 (±10)", largeNearCenter ? 1f : 0f, 1f);
 
             // ---- 特殊效果:状态容器 -------------------------------------------------
             StatusRules effects = db.Effects;

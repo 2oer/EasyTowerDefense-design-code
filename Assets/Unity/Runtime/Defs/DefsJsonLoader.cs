@@ -24,7 +24,12 @@ namespace Game.UnityBridge
             var settings = new JsonSerializerSettings
             {
                 MissingMemberHandling = MissingMemberHandling.Ignore,
-                NullValueHandling = NullValueHandling.Ignore
+                NullValueHandling = NullValueHandling.Ignore,
+
+                // Newtonsoft 默认 Auto 会把 JSON 数组“追加”到属性初始化的默认列表上,
+                // 例如 burn.stackMultipliers 会变成 5 + 5 = 10 项并触发长度校验失败。
+                // 必须改用 Replace,行为才与 System.Text.Json(SimHarness)一致。
+                ObjectCreationHandling = ObjectCreationHandling.Replace
             };
             settings.Converters.Add(new StringEnumConverter());
 

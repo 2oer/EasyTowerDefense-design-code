@@ -60,12 +60,20 @@ namespace Game.Battle
         private int _completedWave;
         private bool _waveStartedFlag;
         private bool _waveCompletedFlag;
+        private bool _awaitingStart;
+        private int _spawnSerial;
 
         public List<SpawnRequest> PendingSpawns { get; } = new List<SpawnRequest>();
 
         public int Wave => _wave;
         public bool AllWavesDone => _phase == Phase.Done;
         public bool InPrep => _phase == Phase.Prep;
+
+        /// <summary>true = 布防阶段一直等待,直到显式调用 StartWaveNow();false = 1.5 s 后自动开战。</summary>
+        public bool ManualStart { get; set; }
+
+        /// <summary>是否正停在"等待玩家开战"的布防阶段。</summary>
+        public bool AwaitingStart => _phase == Phase.Prep && _awaitingStart;
 
         public WaveDirector(ModelDatabase db, DifficultyDef difficulty, MapDef map, Rng rng)
         {
@@ -83,7 +91,24 @@ namespace Game.Battle
             _maxWaves = maxWaves;
             _wave = 1;
             _phase = Phase.Prep;
-            _prepTimer = PrepSeconds;
+            if (ManualStart)
+            {
+                _awaitingStart = true;
+                _prepTimer = 0f;
+            }
+            else
+            {
+                _prepTimer = PrepSeconds;
+            }
+        }
+
+        /// <summary>玩家点击"开始交战"。仅在布防阶段且等待开战时有效。</summary>
+        public bool StartWaveNow()
+        {
+            if (_phase != Phase.Prep || !_awaitingStart) return false;
+            _awaitingStart = false;
+            StartWave();
+            return true;
         }
 
         public void Tick(float dt, int aliveCount, float spawnY)
@@ -93,6 +118,7 @@ namespace Game.Battle
             switch (_phase)
             {
                 case Phase.Prep:
+                    if (_awaitingStart) break;
                     _prepTimer -= dt;
                     if (_prepTimer <= 0f) StartWave();
                     break;
@@ -128,6 +154,7 @@ namespace Game.Battle
             BuildRoster();
             _cursor = 0;
             _tier = 0;
+            _spawnSerial = 0;
             _tierQuota = Math.Max(1, (_roster.Count + _rules.Tiers - 1) / _rules.Tiers);
             _tierEnd = Math.Min(_roster.Count, _tierQuota);
             _elapsed = 0f;
@@ -161,7 +188,8 @@ namespace Game.Battle
             _spawnTimer -= dt;
             if (_spawnTimer > 0f) return;
 
-            PendingSpawns.Add(new SpawnRequest(_roster[_cursor], NextSpawnPosition()));
+            EnemyDef def = _roster[_cursor];
+            PendingSpawns.Add(new SpawnRequest(def, NextSpawnPosition(def)));
             _cursor++;
             _spawnTimer = _rng.Range(_rules.SpawnIntervalMin, _rules.SpawnIntervalMax);
         }
@@ -177,7 +205,14 @@ namespace Game.Battle
             }
             _wave++;
             _phase = Phase.Prep;
-            _prepTimer = PrepSeconds;
+            if (ManualStart)
+            {
+                _awaitingStart = true;
+            }
+            else
+            {
+                _prepTimer = PrepSeconds;
+            }
         }
 
         private float WaveDuration(int wave)
@@ -252,9 +287,35 @@ namespace Game.Battle
             }
         }
 
-        private Vec2 NextSpawnPosition()
+        /// <summary>
+        /// 出生点从中轴开始向两侧铺开,到边界后回绕到中轴继续。
+        /// 目的只是避免同一位置挤太多敌人,而不是把后续生成永久推到两侧。
+        /// 大型敌人的横向偏移压缩到 30%,尽量从中轴附近压上来,便于玩家集火。
+        /// </summary>
+        private Vec2 NextSpawnPosition(EnemyDef def)
         {
-            float x = _rng.Range(2f, _map.Width - 2f);
+            float center = _map.Width * 0.5f;
+
+            // 早期只在中线附近生成,随波次逐步扩大可用宽度。
+            float waveSpan = 6f + _wave * 2.8f;
+            float maxOffset = Math.Min(center - 2f, waveSpan);
+
+            const float bandStep = 2.2f;
+            int bandCount = Math.Max(1, (int)(maxOffset / bandStep) + 1);
+
+            int serial = _spawnSerial++;
+            float side = (serial % 2 == 0) ? 1f : -1f;
+            int band = (serial / 2) % bandCount;
+            float offset = band * bandStep + _rng.Range(0f, 1.2f);
+            if (offset > maxOffset) offset = maxOffset;
+
+            // 大型敌人尽量靠近地图中轴:偏移压到 30%,避免在边路被单塔逐个消耗。
+            if (def.Size == EnemySize.Large) offset *= 0.3f;
+
+            float x = center + side * offset;
+            if (x < 2f) x = 2f;
+            if (x > _map.Width - 2f) x = _map.Width - 2f;
+
             float y = _spawnY + _rng.Range(-1.5f, 1.5f);
             if (y < 0f) y = 0f;
             if (y > _map.Height) y = _map.Height;
