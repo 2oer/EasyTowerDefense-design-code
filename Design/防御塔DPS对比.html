@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>防御塔 DPS × 价格对比</title>
+<style>
+  :root{
+    --bg:#0d1016; --panel:#151a23; --line:#232b38; --txt:#e6edf7; --dim:#8b98ab;
+    --mg:#4ea1ff; --ls:#ff6b6b; --rk:#ffb020; --mr:#c77dff; --ac:#00d1b2; --dr:#7ee787;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;background:radial-gradient(1200px 600px at 20% -10%,#1b2435 0%,#0d1016 55%);
+    color:var(--txt);font-family:"Segoe UI","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+    padding:28px 22px 60px;
+  }
+  .wrap{max-width:1180px;margin:0 auto}
+  h1{font-size:22px;margin:0 0 6px;letter-spacing:.5px}
+  .sub{color:var(--dim);font-size:13px;line-height:1.7;margin-bottom:18px}
+  .controls{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;align-items:center}
+  .group{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .group button{
+    background:transparent;border:0;color:var(--dim);padding:8px 14px;font-size:13px;cursor:pointer;
+    font-family:inherit;transition:.15s;
+  }
+  .group button:hover{color:var(--txt)}
+  .group button.on{background:#243049;color:#fff}
+  .sep{width:1px;height:22px;background:var(--line)}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin:6px 0 4px;font-size:12.5px;color:var(--dim)}
+  .legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:1px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-top:14px}
+  svg{display:block;width:100%;height:auto}
+  .tip{
+    position:fixed;pointer-events:none;background:#0b0f16;border:1px solid #2d3a4f;border-radius:9px;
+    padding:9px 12px;font-size:12.5px;line-height:1.55;opacity:0;transition:opacity .1s;z-index:9;
+    box-shadow:0 8px 24px rgba(0,0,0,.5);max-width:280px;
+  }
+  .tip b{color:#fff}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th,td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+  th{color:var(--dim);font-weight:600;font-size:11.5px;letter-spacing:.4px;text-align:right;position:sticky;top:0;background:var(--panel)}
+  td:nth-child(1),td:nth-child(2),th:nth-child(1),th:nth-child(2){text-align:left}
+  td.note,th.note{text-align:left;white-space:normal;color:var(--dim);min-width:220px}
+  tr:hover td{background:#1a2130}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+  .notes{margin-top:16px;font-size:12.5px;color:var(--dim);line-height:1.85}
+  .notes b{color:#cfd8e6}
+  .notes li{margin-bottom:4px}
+  .warn{color:#ffb020}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>防御塔 DPS × 累计价格</h1>
+  <div class="sub">
+    双对数坐标。横轴 = 从建造到该形态的<strong>累计金币</strong>（Lv2~Lv7 按 <code>基础价 × (等级−1)²</code>，Lv4/Lv7 额外 ×1.25）；
+    纵轴 = 文档中的 DPS。实心圆 = 单体，空心三角 = 对群。虚线为「每 1000 金币换多少 DPS」的等值线，越靠左上越划算。
+  </div>
+
+  <div class="controls">
+    <div class="group" id="lvF">
+      <button data-lv="0" class="on">全部等级</button>
+      <button data-lv="1">Lv1</button>
+      <button data-lv="4">Lv4</button>
+      <button data-lv="7">Lv7</button>
+    </div>
+    <div class="sep"></div>
+    <div class="group" id="mF">
+      <button data-m="both" class="on">单体 + 对群</button>
+      <button data-m="s">只看单体</button>
+      <button data-m="a">只看对群</button>
+    </div>
+  </div>
+
+  <div class="legend" id="legend"></div>
+
+  <div class="card">
+    <svg id="chart" viewBox="0 0 1120 640" preserveAspectRatio="xMidYMid meet"></svg>
+  </div>
+
+  <div class="card" style="padding:0;overflow:auto;max-height:520px">
+    <table id="tbl">
+      <thead><tr>
+        <th>塔</th><th>形态</th><th>累计价</th><th>单体 DPS</th><th>对群 DPS</th>
+        <th>对群÷单体</th><th>DPS/千元</th><th class="note">特殊说明 / 口径</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="notes">
+    <b>口径警告（这几列不能横向直接比）</b>
+    <ul>
+      <li><b>激光</b>的对群是「整齐方块」理论上限（`单束 × 横向 × 纵向`），纵队时聚焦从 4679 掉到 1560；<b>火箭/迫击炮</b>的对群同样依赖敌人密度。</li>
+      <li><b>发射井 / 温压 / 氢弹</b>是「持续输出」口径，20~40 s 单发的爆发尖峰不计入 DPS；瞬时清场能力被严重低估。</li>
+      <li><b>无人机</b>已折算出勤率（编队往返、重装、整备），不是瞬时 DPS；表中是平均 DPS。</li>
+      <li><b>电磁反器材 / 贯穿内爆</b>的账面 DPS 未计护甲系数：对中型是机枪的 2.4 倍，对重型从 0% 变 100%（对大型 435）。</li>
+      <li><b>富集钚、球形闪电</b>的收益在表外：前者全屏衰变、后者计充电后对群 +54%~+70%。</li>
+      <li>所有 DPS 为裸值，<span class="warn">未乘护甲、衰减、易伤、减益</span>；同 DPS 不同穿甲的塔实战差距很大。</li>
+    </ul>
+  </div>
+</div>
+
+<div class="tip" id="tip"></div>
+
+<script>
+const TC = {机枪:'#4ea1ff',激光:'#ff6b6b',火箭:'#ffb020',迫击炮:'#c77dff',电弧:'#00d1b2',无人机:'#7ee787'};
+// p=累计价, s=单体, a=对群, lv=等级, note=口径
+const DATA = [
+  // 机枪塔（基础价 100）
+  {t:'机枪',n:'Lv1 基础',lv:1,p:100,s:98,a:98,note:'扫射；弹链 40、换弹 3 s → 占空比 81.6%，账面 120 → 98'},
+  {t:'机枪',n:'Lv4 转轮机枪',lv:4,p:1725,s:234,a:234,note:'6.79 发/s，单体即对群（扫射）'},
+  {t:'机枪',n:'Lv4 电磁反器材',lv:4,p:1725,s:126,a:126,note:'账面 DPS；留存 10 → 单发贯穿 5~7 个，排队时对群约 ×5'},
+  {t:'机枪',n:'Lv7 转轮+贫铀燃烧弹',lv:7,p:10325,s:123,a:123,note:'伤害 ×0.5 换留存 3.6 + 燃烧 20/s'},
+  {t:'机枪',n:'Lv7 转轮+高爆弹',lv:7,p:10325,s:234,a:234,note:'小范围爆炸 2，精度 8%'},
+  {t:'机枪',n:'Lv7 电磁+低温钢芯',lv:7,p:10325,s:286,a:286,note:'留存 15.0 + 低温；对群靠贯穿'},
+  {t:'机枪',n:'Lv7 电磁+贯穿内爆',lv:7,p:10325,s:61,a:61,note:'账面低；对大型持续 ≈435，二段 ×35%~×875%'},
+
+  // 激光塔（基础价 160）
+  {t:'激光',n:'Lv1 基础',lv:1,p:160,s:150,a:450,note:'束宽 0.5、留存 5；纵横 1×3 命中'},
+  {t:'激光',n:'Lv4 聚焦透镜',lv:4,p:2760,s:1560,a:4679,note:'纵队 5 命中 / 整齐方块 15 命中'},
+  {t:'激光',n:'Lv4 扫荡透镜',lv:4,p:2760,s:1560,a:1871,note:'3 束分火，散兵线不掉（18 命中）'},
+  {t:'激光',n:'Lv7 聚焦+热熔',lv:7,p:16520,s:2340,a:2340,note:'易伤 ×2.0 + 无限贯穿；对铁壁 +50%，对群为无限穿一列'},
+  {t:'激光',n:'Lv7 聚焦+量子光压',lv:7,p:16520,s:1560,a:6223,note:'束宽 3.0（横向 4）+ 阻滞 3~5，进攻塔转控制'},
+  {t:'激光',n:'Lv7 扫荡+散射棱镜',lv:7,p:16520,s:900,a:8000,note:'单束扇展 60°，单体大降、覆盖大幅上升（示意值，文档未给终值）'},
+  {t:'激光',n:'Lv7 扫荡+富集钚',lv:7,p:16520,s:312,a:312,note:'单体 −80% 换辐射全屏衰变（2^层数 DoT，无视护甲）'},
+
+  // 火箭塔（基础价 210）
+  {t:'火箭',n:'Lv1 基础',lv:1,p:210,s:80,a:240,note:'4 联发 + 4 s 重装；爆炸 8，对群随密度'},
+  {t:'火箭',n:'Lv4 蜂窝发射器',lv:4,p:3623,s:191,a:765,note:'9 条前身路径区间：单体 141.8~191.3 / 对群 567~765'},
+  {t:'火箭',n:'Lv4 导弹发射井',lv:4,p:3623,s:160,a:3363,note:'20 s/发；持续口径，爆发不计入'},
+  {t:'火箭',n:'Lv7 蜂窝→电浆导弹',lv:7,p:21683,s:287,a:857,note:'+充电 2 层/命中，计充电后对群 +40%~+50%'},
+  {t:'火箭',n:'Lv7 蜂窝→分裂弹头',lv:7,p:21683,s:297,a:1033,note:'每枚再分裂 3 枚，单体最强'},
+  {t:'火箭',n:'Lv7 发射井→温压云爆',lv:7,p:21683,s:123,a:5066,note:'30 s/发 + 范围 80 燃烧区 3 s（DoT 另计）'},
+  {t:'火箭',n:'Lv7 发射井→氢弹头',lv:7,p:21683,s:222,a:6868,note:'40 s/发；辐射 15 + 爆炸 60，全表对群最高'},
+
+  // 迫击炮（基础价 220）
+  {t:'迫击炮',n:'Lv1 基础',lv:1,p:220,s:84,a:252,note:'duty 恒 50%；爆炸 4 → 3 命中'},
+  {t:'迫击炮',n:'Lv4 空爆子母弹',lv:4,p:3795,s:84,a:1200,note:'单体几乎不变；32 颗子弹头，吃敌人密度'},
+  {t:'迫击炮',n:'Lv4 高爆破片弹',lv:4,p:3795,s:88,a:1144,note:'9 路径区间 512~1144，单体 +5%'},
+  {t:'迫击炮',n:'Lv7 空爆→凝固汽油',lv:7,p:22715,s:84,a:1440,note:'+3 s 燃烧区（每 1 s +1 层），DoT 另计'},
+  {t:'迫击炮',n:'Lv7 空爆→液氮弹',lv:7,p:22715,s:84,a:1440,note:'+低温区与中等阻滞，控制向'},
+  {t:'迫击炮',n:'Lv7 破片→阵列炮',lv:7,p:22715,s:84,a:1910,note:'三独立弹舱，射速 ×3 / 单发 ×0.6'},
+  {t:'迫击炮',n:'Lv7 破片→智能内爆',lv:7,p:22715,s:117,a:1320,note:'单体 +39%，附加碎甲易伤（护甲系数 50→70）'},
+
+  // 电弧（基础价 110）
+  {t:'电弧',n:'Lv1 基础',lv:1,p:110,s:33.5,a:134,note:'连锁 3 次、范围 2.25；对群依赖一排'},
+  {t:'电弧',n:'Lv4 高压电容',lv:4,p:1898,s:28,a:285,note:'有跳目标单体 −15%；孤立目标引爆 +104%'},
+  {t:'电弧',n:'Lv4 球形闪电',lv:4,p:1898,s:29,a:276,note:'范围 6；计 2 层充电后对群 ≈340（+54%~+70%）'},
+  {t:'电弧',n:'Lv7 高压→裂变闪电',lv:7,p:11358,s:21,a:402,note:'每跳分裂 ×2（1+2+4+8=15 命中）'},
+  {t:'电弧',n:'Lv7 高压→引雷针',lv:7,p:11358,s:31,a:385,note:'避雷针 3 次 × 范围 12，额外 +1 跳'},
+
+  // 无人机库（基础价 150）
+  {t:'无人机',n:'Lv1 基础（6 架）',lv:1,p:150,s:18,a:18,note:'单架 18；编队 6，已含出勤率折算'},
+  {t:'无人机',n:'Lv4 飓风壁垒',lv:4,p:2588,s:110,a:110,note:'1 架重型；巡航+返航+重装构成空窗'},
+  {t:'无人机',n:'Lv4 移动工厂',lv:4,p:2588,s:102,a:102,note:'编队 10、出勤 92.2%；本体可被攻击（3000 血）'},
+  {t:'无人机',n:'Lv7 精装修机库',lv:7,p:15488,s:176,a:176,note:'编队 15、每架 +2 导弹；+72% 超带宽（指定例外）'},
+  {t:'无人机',n:'Lv7 大舰巨炮',lv:7,p:15488,s:102,a:102,note:'+阳电子炮独立乘区：对大型 350 / 对群上限 980'},
+  {t:'无人机',n:'Lv7 雷暴',lv:7,p:15488,s:160,a:160,note:'空袭型；矩形带投弹，160 为平均'},
+  {t:'无人机',n:'Lv7 极光',lv:7,p:15488,s:162.5,a:162.5,note:'持续照射型；162.5 为平均'}
+];
+
+// ---------- 绘图 ----------
+const W=1120,H=640,L=78,R=26,T=26,B=64;
+const X0=80,X1=30000,Y0=15,Y1=10000;
+const lg=Math.log10;
+const sx=v=>L+(lg(v)-lg(X0))/(lg(X1)-lg(X0))*(W-L-R);
+const sy=v=>H-B-(lg(v)-lg(Y0))/(lg(Y1)-lg(Y0))*(H-T-B);
+const svg=document.getElementById('chart');
+const tip=document.getElementById('tip');
+let filterLv=0, metric='both';
+
+function el(t,a={},kids=[]){const n=document.createElementNS('http://www.w3.org/2000/svg',t);
+  for(const k in a) n.setAttribute(k,a[k]); kids.forEach(c=>n.appendChild(c)); return n;}
+
+function draw(){
+  svg.innerHTML='';
+  const g=el('g',{});
+  // 网格
+  const xticks=[100,200,300,500,1000,2000,3000,5000,10000,20000,50000];
+  const yticks=[20,30,50,100,200,300,500,1000,2000,3000,5000,10000];
+  xticks.forEach(v=>{ if(v<X0||v>X1) return;
+    g.appendChild(el('line',{x1:sx(v),x2:sx(v),y1:T,y2:H-B,stroke:'#1b2330','stroke-width':1}));
+    g.appendChild(el('text',{x:sx(v),y:H-B+20,fill:'#6f7d91','font-size':11,'text-anchor':'middle'},[document.createTextNode(v>=1000?(v/1000)+'k':v)]));
+  });
+  yticks.forEach(v=>{ if(v<Y0||v>Y1) return;
+    g.appendChild(el('line',{x1:L,x2:W-R,y1:sy(v),y2:sy(v),stroke:'#1b2330','stroke-width':1}));
+    g.appendChild(el('text',{x:L-10,y:sy(v)+4,fill:'#6f7d91','font-size':11,'text-anchor':'end'},[document.createTextNode(v)]));
+  });
+  // 等值线 DPS/千元 = c  =>  y = c*x/1000
+  [[1,'#2b3a52','1'],[10,'#33475f','10'],[100,'#3d566f','100']].forEach(([c,col,lab])=>{
+    let pts=[];
+    for(let i=0;i<=40;i++){
+      const lx=lg(X0)+(lg(X1)-lg(X0))*i/40, x=Math.pow(10,lx), y=c*x/1000;
+      if(y>=Y0&&y<=Y1) pts.push([sx(x),sy(y)]);
+    }
+    if(pts.length>1) g.appendChild(el('polyline',{points:pts.map(p=>p.join(',')).join(' '),fill:'none',stroke:col,'stroke-width':1,'stroke-dasharray':'4 5'}));
+    const xe=Math.min(X1, Y1*1000/c);
+    if(xe>X0) g.appendChild(el('text',{x:sx(xe)-6,y:sy(c*Math.min(X1,xe)/1000)-6,fill:'#4a5f7a','font-size':10,'text-anchor':'end'},[document.createTextNode(lab+' DPS/千元')]));
+  });
+  // 轴标题
+  g.appendChild(el('text',{x:(L+W-R)/2,y:H-16,fill:'#8b98ab','font-size':12,'text-anchor':'middle'},[document.createTextNode('累计金币（对数）')]));
+  g.appendChild(el('text',{x:18,y:(T+H-B)/2,fill:'#8b98ab','font-size':12,'text-anchor':'middle',transform:`rotate(-90 18 ${(T+H-B)/2})`},[document.createTextNode('DPS（对数）')]));
+
+  const rows=DATA.filter(d=>filterLv===0||d.lv===filterLv);
+  // 对群先画（三角、空心），单体后画，避免遮挡
+  const order=[...rows].sort((a,b)=>(a.t<b.t?-1:1));
+  if(metric!=='s') order.forEach(d=>{
+    if(!d.a) return;
+    const x=sx(d.p),y=sy(Math.min(d.a,Y1));
+    const t=el('path',{d:`M${x} ${y-7} L${x+6.6} ${y+4.5} L${x-6.6} ${y+4.5} Z`,fill:'none',stroke:TC[d.t],'stroke-width':2,'stroke-opacity':.95});
+    t.style.cursor='pointer';
+    t.addEventListener('mousemove',e=>showTip(e,d,'a'));
+    t.addEventListener('mouseleave',hideTip);
+    g.appendChild(t);
+  });
+  if(metric!=='a') order.forEach(d=>{
+    if(!d.s) return;
+    const x=sx(d.p),y=sy(Math.min(d.s,Y1));
+    const c=el('circle',{cx:x,cy:y,r:5.4,fill:TC[d.t],stroke:'#0d1016','stroke-width':1.5});
+    c.style.cursor='pointer';
+    c.addEventListener('mousemove',e=>showTip(e,d,'s'));
+    c.addEventListener('mouseleave',hideTip);
+    g.appendChild(c);
+  });
+  // 关键标注（Lv7 对群前三）
+  if(metric!=='s'&&filterLv!==1&&filterLv!==4){
+    const top=[...DATA].filter(d=>d.lv===7&&d.a).sort((a,b)=>b.a-a.a).slice(0,3);
+    top.forEach(d=>{
+      const x=sx(d.p),y=sy(Math.min(d.a,Y1));
+      g.appendChild(el('text',{x:x+10,y:y+4,fill:TC[d.t],'font-size':11},[document.createTextNode(d.n.replace(/^Lv7 /,''))]));
+    });
+  }
+  svg.appendChild(g);
+}
+
+function showTip(e,d,which){
+  const v=which==='a'?d.a:d.s, o=which==='a'?d.s:d.a;
+  tip.innerHTML=`<b style="color:${TC[d.t]}">${d.t} · ${d.n}</b><br>
+    累计价格 <b>${d.p.toLocaleString()}</b> 金币<br>
+    ${which==='a'?'对群':'单体'} DPS <b>${v.toLocaleString()}</b>${o?`<br>${which==='a'?'单体':'对群'} DPS ${o.toLocaleString()}`:''}<br>
+    <span style="color:#8b98ab">${d.note}</span>`;
+  tip.style.opacity=1;
+  const x=Math.min(e.clientX+16, innerWidth-300), y=Math.min(e.clientY+16, innerHeight-150);
+  tip.style.left=x+'px'; tip.style.top=y+'px';
+}
+function hideTip(){tip.style.opacity=0;}
+
+document.querySelectorAll('#lvF button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#lvF button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); filterLv=+b.dataset.lv; draw();
+});
+document.querySelectorAll('#mF button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#mF button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); metric=b.dataset.m; draw();
+});
+
+// 图例
+document.getElementById('legend').innerHTML =
+  Object.entries(TC).map(([k,c])=>`<span><i style="background:${c}"></i>${k}</span>`).join('')
+  + `<span style="margin-left:6px">● 单体　▲ 对群</span>`;
+
+// 表格
+const tb=document.querySelector('#tbl tbody');
+DATA.slice().sort((a,b)=>a.lv-b.lv||a.t.localeCompare(b.t,'zh')||a.p-b.p).forEach(d=>{
+  const tr=document.createElement('tr');
+  const ratio=d.a&&d.s?(d.a/d.s).toFixed(1)+'×':'—';
+  const gold=(d.s||d.a)*1000/d.p;
+  tr.innerHTML=`<td><span class="dot" style="background:${TC[d.t]}"></span>${d.t}</td>
+    <td>${d.n}</td><td>${d.p.toLocaleString()}</td>
+    <td>${d.s?d.s.toLocaleString():'—'}</td><td>${d.a?d.a.toLocaleString():'—'}</td>
+    <td>${ratio}</td><td>${gold.toFixed(1)}</td><td class="note">${d.note}</td>`;
+  tb.appendChild(tr);
+});
+
+draw();
+</script>
+</body>
+</html>

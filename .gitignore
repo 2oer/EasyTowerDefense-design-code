@@ -1,0 +1,17 @@
+# .NET 构建产物
+bin/
+obj/
+*.user
+.vs/
+TestResults/
+*.log
+
+# Trae / 本地工具产物
+.markdown-collab/
+.trae-html-share-packages/
+
+# Unity(尚未创建工程,预留)
+Library/
+Temp/
+Logs/
+UserSettings/

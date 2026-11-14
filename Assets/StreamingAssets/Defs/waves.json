@@ -1,0 +1,20 @@
+{
+  "mediumStartWave": 5,
+  "mediumBase": 2,
+  "mediumGrowthWaves": 5,
+  "mediumGrowth": 1.5,
+  "largeStartWave": 10,
+  "largeBase": 1,
+  "largeGrowthWaves": 10,
+  "largeGrowth": 1.5,
+  "largeWaveMultiplier": 1.25,
+  "durationBase": 18,
+  "durationPerWave": 0.6,
+  "durationMin": 20,
+  "durationMax": 45,
+  "tiers": 4,
+  "spawnIntervalMin": 0.25,
+  "spawnIntervalMax": 0.6,
+  "tierEarlyUnlockRatio": 0.30,
+  "hardCap": 500
+}

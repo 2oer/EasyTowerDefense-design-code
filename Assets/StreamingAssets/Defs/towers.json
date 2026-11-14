@@ -1,0 +1,38 @@
+[
+  {
+    "id": "machine_gun",
+    "price": 100,
+    "damage": 40,
+    "fireRate": 3,
+    "range": 25,
+    "turnSpeed": 20,
+    "blockForce": 4.0,
+    "pierce": "Low",
+    "retention": 2,
+    "ammo": 40,
+    "reloadTime": 3,
+    "explosionRadius": 0,
+    "beamWidth": 0,
+    "strategy": "Spray",
+    "delivery": "HitscanLine",
+    "bulletRadius": 0.25
+  },
+  {
+    "id": "laser",
+    "price": 160,
+    "damage": 30,
+    "fireRate": 5,
+    "range": 50,
+    "turnSpeed": 20,
+    "blockForce": 0,
+    "pierce": "Low",
+    "retention": 5,
+    "ammo": 0,
+    "reloadTime": 0,
+    "explosionRadius": 0,
+    "beamWidth": 0.5,
+    "strategy": "Focus",
+    "delivery": "HitscanRect",
+    "bulletRadius": 0
+  }
+]

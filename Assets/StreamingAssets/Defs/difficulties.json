@@ -1,0 +1,35 @@
+[
+  {
+    "id": "easy",
+    "hpGrowthPerWave": 0.05,
+    "goldRate": 1.2,
+    "mediumShare": 0.75,
+    "largeShare": 0.75,
+    "startGold": 400,
+    "smallBase": 26,
+    "smallStep": 10,
+    "metaRate": 1.2
+  },
+  {
+    "id": "normal",
+    "hpGrowthPerWave": 0.07,
+    "goldRate": 1.0,
+    "mediumShare": 1.0,
+    "largeShare": 1.0,
+    "startGold": 300,
+    "smallBase": 30,
+    "smallStep": 12,
+    "metaRate": 1.0
+  },
+  {
+    "id": "hard",
+    "hpGrowthPerWave": 0.10,
+    "goldRate": 0.9,
+    "mediumShare": 1.30,
+    "largeShare": 1.30,
+    "startGold": 250,
+    "smallBase": 34,
+    "smallStep": 14,
+    "metaRate": 0.9
+  }
+]
