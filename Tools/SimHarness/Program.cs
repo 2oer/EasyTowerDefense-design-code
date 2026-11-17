@@ -7,6 +7,7 @@ using Game.Combat;
 using Game.Core;
 using Game.Entity;
 using Game.Model;
+using Game.Targeting;
 
 namespace SimHarness
 {
@@ -526,6 +527,86 @@ namespace SimHarness
             TowerRuntimeStats hive = TowerStatsBuilder.Build(db.FindTower("rocket")!, hiveNodes);
             ok &= Check("蜂窝 齐射 4", hive.Salvo, 4f);
             ok &= Check("蜂窝 每发 8 子弹头", hive.SubCount, 8f);
+
+            // ---- 机枪 / 激光 Lv7 唯一机制已接线 --------------------------------
+            var endingMechanics = new (string Id, string Mechanic)[]
+            {
+                ("mg_lv7_du_incendiary", TowerMechanics.Incendiary),
+                ("mg_lv7_he", TowerMechanics.HighExplosive),
+                ("mg_lv7_cryo_core", TowerMechanics.CryoCore),
+                ("mg_lv7_implosion", TowerMechanics.Implosion),
+                ("laser_lv7_thermal_melt", TowerMechanics.ThermalMelt),
+                ("laser_lv7_scatter_prism", TowerMechanics.ScatterPrism),
+                ("laser_lv7_enriched_plutonium", TowerMechanics.EnrichedPlutonium)
+            };
+            for (int i = 0; i < endingMechanics.Length; i++)
+            {
+                UpgradeNodeDef? node = db.FindUpgrade(endingMechanics[i].Id);
+                ok &= Check(endingMechanics[i].Id + " 机制已接线",
+                    node != null &&
+                    string.Equals(node.Mechanic, endingMechanics[i].Mechanic, StringComparison.Ordinal)
+                        ? 1f : 0f, 1f);
+            }
+
+            // ---- 持续照射不可中断:目标死亡后仍走完剩余照射时间 ------------------
+            TowerDef? laserDef = db.FindTower("laser");
+            EnemyDef? workerDef = db.FindEnemy("worker");
+            if (laserDef != null && workerDef != null)
+            {
+                var world = new EntityWorld();
+                var combat = new CombatWorld(db.Effects);
+                TowerAgent beamTower = world.AddTower(laserDef, new Vec2(40f, 20f));
+                foreach (string id in new[]
+                {
+                    "laser_lv2_efficient_cool", "laser_lv3_stable_circuit", "laser_lv4_focus_lens"
+                })
+                {
+                    UpgradeNodeDef? node = db.FindUpgrade(id);
+                    if (node != null) beamTower.ApplyUpgrade(node);
+                }
+
+                EnemyRuntime victim = MakeEnemy(
+                    db.Effects, workerDef, new Vec2(50f, 20f), 100f);
+                var enemies = new List<EnemyRuntime> { victim };
+                var beamHits = new List<EnemyRuntime>();
+                combat.Targets.Add(victim);
+
+                bool started = false;
+                for (int i = 0; i < 300 && !started; i++)
+                {
+                    beamTower.Tick(1f / 30f, enemies, beamHits, combat);
+                    started = beamTower.ShotTraces.Count > 0;
+                }
+
+                victim.ApplyDamage(1e9f, 0f);
+                enemies.Clear();
+                combat.Targets.Clear();
+
+                bool continued = false;
+                for (int i = 0; i < 4; i++)
+                {
+                    beamTower.Tick(1f / 30f, enemies, beamHits, combat);
+                    if (beamTower.ShotTraces.Count > 0) continued = true;
+                }
+
+                ok &= Check("持续照射已开始", started ? 1f : 0f, 1f);
+                ok &= Check("目标死亡后持续照射不中断", continued ? 1f : 0f, 1f);
+            }
+
+            // ---- 战略索敌:斩首当前生命值最高的目标 ------------------------------
+            var strategic = new List<ITargetCandidate>
+            {
+                MakeEnemy(db.Effects, workerDef ?? db.Enemies[0], new Vec2(45f, 20f), 100f),
+                MakeEnemy(db.Effects, workerDef ?? db.Enemies[0], new Vec2(58f, 20f), 800f)
+            };
+            var strategicProbe = new DamagePacket { Amount = 100f, Pierce = ArmorPierce.High };
+            int strategicIndex = TargetSelector.SelectBest(
+                strategic, new Vec2(40f, 20f), 30f, strategicProbe, TowerStrategy.Strategic);
+            ok &= Check("战略索敌 = 当前生命最高", strategicIndex, 1f);
+
+            UpgradeNodeDef? siloNode = db.FindUpgrade("rocket_lv4_missile_silo");
+            ok &= Check("导弹发射井 战略索敌",
+                siloNode != null && siloNode.Strategy == TowerStrategy.Strategic ? 1f : 0f, 1f);
 
             // ---- 布防阶段 / 手动开战 / 生成位置 / 拆除 -----------------------------
             var manual = new BattleSimulation(db, "normal", "standard", 12345UL, 0f, "focus", false, true);

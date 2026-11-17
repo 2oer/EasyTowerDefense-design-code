@@ -47,6 +47,12 @@ namespace Game.Targeting
                     if (remaining <= 0f) continue;
                     weight *= MathUtil.Clamp01(remaining / c.MaxHp);
                 }
+                else if (strategy == TowerStrategy.Strategic)
+                {
+                    // 斩首:按当前生命值排序,不按最大生命与距离。
+                    weight = c.Hp;
+                    if (weight <= 0f) continue;
+                }
 
                 bool better;
                 if (bestIndex < 0)

@@ -62,6 +62,27 @@ namespace Game.Entity
         }
     }
 
+    /// <summary>一次 hitscan 射击的弹道描述,只给表现层画曳光 / 光束,不参与结算。</summary>
+    public readonly struct ShotTrace
+    {
+        public readonly Vec2 Origin;
+        public readonly Vec2 Direction;
+        public readonly float Range;
+        public readonly float HalfWidth;
+
+        /// <summary>true = 矩形光束(激光),false = 直线弹道(机枪)。</summary>
+        public readonly bool Rectangle;
+
+        public ShotTrace(Vec2 origin, Vec2 direction, float range, float halfWidth, bool rectangle)
+        {
+            Origin = origin;
+            Direction = direction;
+            Range = range;
+            HalfWidth = halfWidth;
+            Rectangle = rectangle;
+        }
+    }
+
     /// <summary>
     /// 防御塔运行时:直线 hitscan(机枪)、矩形光束(激光)、连锁(电弧)、
     /// 抛射 / 追踪弹丸(迫击炮 / 火箭)与无人机库。
@@ -73,6 +94,20 @@ namespace Game.Entity
         public TowerRuntimeStats Stats { get; private set; } = null!;
         public Vec2 Position { get; private set; }
         public TurretMotor Motor { get; } = new TurretMotor();
+
+        /// <summary>本逻辑帧内的 hitscan 弹道(每束一条),供表现层绘制。</summary>
+        private readonly List<ShotTrace> _shotTraces = new List<ShotTrace>();
+        public IReadOnlyList<ShotTrace> ShotTraces => _shotTraces;
+
+        // ---- 持续照射(聚焦 / 扫荡透镜) ----------------------------------------
+        private float _beamSecondsLeft;
+        private float _beamTickTimer;
+        private float _beamRestTimer;
+        private float _beamAngle;
+        private int _beamTargetId = -1;
+
+        private readonly List<IAoETarget> _aoeTargets = new List<IAoETarget>();
+        private readonly List<IAoETarget> _aoeHitBuffer = new List<IAoETarget>();
 
         /// <summary>已选升级节点(按等级升序)。</summary>
         public List<UpgradeNodeDef> Upgrades { get; } = new List<UpgradeNodeDef>();
@@ -163,6 +198,12 @@ namespace Game.Entity
             DeployedDrones = 0;
             DeployTimer = 0f;
             SquadsDeployed = 0;
+
+            _beamSecondsLeft = 0f;
+            _beamTickTimer = 0f;
+            _beamRestTimer = 0f;
+            _beamAngle = 0f;
+            _beamTargetId = -1;
         }
 
         /// <summary>返回本帧是否开火 / 派出编队。</summary>
@@ -172,6 +213,14 @@ namespace Game.Entity
             List<EnemyRuntime> hitBuffer,
             CombatWorld combat)
         {
+            _shotTraces.Clear();
+
+            if (Stats.Continuous)
+            {
+                TickContinuous(dt, enemies, hitBuffer);
+                return _shotTraces.Count > 0;
+            }
+
             if (Stats.DroneCapacity > 0)
             {
                 TickDroneCarrier(dt, enemies, combat);
@@ -196,6 +245,7 @@ namespace Game.Entity
             int targetIndex = SelectTarget(enemies, probe);
             if (targetIndex < 0)
             {
+                PreAim(enemies, dt);
                 LastHitCount = 0;
                 return false;
             }
@@ -204,7 +254,7 @@ namespace Game.Entity
             Vec2 toTarget = target.Position - Position;
             float desired = (float)Math.Atan2(toTarget.Y, toTarget.X);
 
-            if (Stats.NoTurn)
+            if (Stats.NoTurn || Stats.Mechanic == TowerMechanics.MissileSilo)
             {
                 Motor.SnapTo(desired);
             }
@@ -253,7 +303,9 @@ namespace Game.Entity
         private DamagePacket BuildPacket(float amount) => new DamagePacket
         {
             Amount = amount,
-            Type = Stats.DamageType,
+            Type = Stats.Mechanic == TowerMechanics.EnrichedPlutonium
+                ? DamageType.Radiation
+                : Stats.DamageType,
             Pierce = Stats.Pierce,
             Retention = Stats.Retention,
             BlockForce = Stats.BlockForce,
@@ -263,6 +315,39 @@ namespace Game.Entity
 
         private float HalfWidth() =>
             Stats.Delivery == DeliveryKind.HitscanRect ? Stats.BeamWidth * 0.5f : Stats.BulletRadius;
+
+        /// <summary>
+        /// 侦察范围 = 射程 ×125%:没有可开火目标时,先朝最近的可侦察目标预转向,进入射程即可开火。
+        /// </summary>
+        private void PreAim(IReadOnlyList<EnemyRuntime> enemies, float dt)
+        {
+            if (Stats.NoTurn) return;
+
+            float scoutRange = Stats.Range * 1.25f;
+            EnemyRuntime? nearest = null;
+            float bestDistance = float.MaxValue;
+
+            for (int i = 0; i < enemies.Count; i++)
+            {
+                EnemyRuntime enemy = enemies[i];
+                if (!enemy.Alive) continue;
+                float distance = Vec2.Distance(Position, enemy.Position) - enemy.Radius;
+                if (distance > scoutRange || distance < Stats.MinRange) continue;
+                if (distance >= bestDistance) continue;
+                bestDistance = distance;
+                nearest = enemy;
+            }
+
+            if (nearest == null) return;
+
+            Vec2 toTarget = nearest.Position - Position;
+            float desired = (float)Math.Atan2(toTarget.Y, toTarget.X);
+            float faceDistance = Math.Max(1f, toTarget.Length - nearest.Radius);
+            float tolerance = Math.Max(
+                TurretMotor.PointBlankToleranceRad,
+                (float)Math.Atan2(HalfWidth(), faceDistance));
+            Motor.TurnTowards(desired, Stats.TurnSpeed, tolerance, dt);
+        }
 
         // ---- 索敌 --------------------------------------------------------------
 
@@ -317,6 +402,7 @@ namespace Game.Entity
 
                 float coef = DamageCalculator.Multiplier(probe, enemy.Def);
                 if (coef <= 0f) continue;
+                if (enemy.Hp - enemy.DamageSent <= 0f) continue;
 
                 float edge = Math.Max(1f, center - enemy.Radius);
                 float weight = coef * enemy.MaxHp / edge;
@@ -325,6 +411,10 @@ namespace Game.Entity
                     float remaining = enemy.Hp - enemy.DamageSent;
                     if (remaining <= 0f) continue;
                     weight *= MathUtil.Clamp01(remaining / enemy.MaxHp);
+                }
+                else if (Stats.Strategy == TowerStrategy.Strategic)
+                {
+                    weight = enemy.Hp;
                 }
 
                 bool better = best < 0 || weight > bestWeight + 1e-4f;
@@ -576,23 +666,189 @@ namespace Game.Entity
 
             int beams = Math.Max(1, Stats.BeamCount);
             float baseAngle = Motor.AimAngle;
+            float step = BeamStep(beams);
             int totalHits = 0;
 
             for (int b = 0; b < beams; b++)
             {
-                float offset = beams == 1 ? 0f : (b - (beams - 1) * 0.5f) * BeamSpreadRad;
+                float offset = beams == 1 ? 0f : (b - (beams - 1) * 0.5f) * step;
                 float angle = baseAngle + offset;
                 var direction = new Vec2((float)Math.Cos(angle), (float)Math.Sin(angle));
                 HitscanResolver.Query(Position, direction, Stats.Range, HalfWidth(), enemies, hitBuffer);
-                totalHits += ApplyBeam(hitBuffer);
+                totalHits += ApplyBeam(hitBuffer, Stats.Damage, 0f, enemies);
+                _shotTraces.Add(new ShotTrace(
+                    Position, direction, Stats.Range, HalfWidth(),
+                    Stats.Delivery == DeliveryKind.HitscanRect));
             }
 
+            if (Stats.Mechanic == TowerMechanics.EnrichedPlutonium) ApplyDecayInRange(enemies);
             LastHitCount = totalHits;
         }
 
-        private int ApplyBeam(List<EnemyRuntime> hitBuffer)
+        // ---- 持续照射(聚焦 / 扫荡透镜) ----------------------------------------
+
+        /// <summary>
+        /// 不可中断的持续照射:锁定方向后按固定间隔结算,直到走完整个照射时长;
+        /// 期间即使目标死亡或离开,也会继续把剩余时间打完。
+        /// </summary>
+        private void TickContinuous(float dt, IReadOnlyList<EnemyRuntime> enemies, List<EnemyRuntime> hitBuffer)
         {
-            var packet = BuildPacket(Stats.Damage);
+            if (_beamRestTimer > 0f)
+            {
+                _beamRestTimer -= dt;
+                if (_beamRestTimer < 0f) _beamRestTimer = 0f;
+                return;
+            }
+
+            if (_beamSecondsLeft > 0f)
+            {
+                _beamSecondsLeft -= dt;
+                _beamTickTimer -= dt;
+
+                if (_beamTickTimer <= 0f)
+                {
+                    _beamTickTimer += Math.Max(0.001f, Stats.ContinuousInterval);
+                    UpdateBeamAim(enemies);
+                    EmitBeamTick(enemies, hitBuffer);
+                }
+
+                if (_beamSecondsLeft <= 0f)
+                {
+                    _beamSecondsLeft = 0f;
+                    _beamRestTimer = Math.Max(0f, Stats.ContinuousRest);
+                    ResetBeamHeat(enemies);
+                    _beamTargetId = -1;
+                }
+                return;
+            }
+
+            var probe = BuildPacket(Stats.Damage);
+            int index = SelectTarget(enemies, probe);
+            if (index < 0)
+            {
+                PreAim(enemies, dt);
+                return;
+            }
+
+            EnemyRuntime target = enemies[index];
+            Vec2 toTarget = target.Position - Position;
+            float desired = (float)Math.Atan2(toTarget.Y, toTarget.X);
+            float faceDistance = Math.Max(1f, toTarget.Length - target.Radius);
+            float tolerance = Math.Max(
+                TurretMotor.PointBlankToleranceRad,
+                (float)Math.Atan2(HalfWidth(), faceDistance));
+
+            if (!Motor.TurnTowards(desired, Stats.TurnSpeed, tolerance, dt)) return;
+            Motor.SnapTo(desired);
+
+            _beamTargetId = target.Id.Index;
+            _beamAngle = desired;
+            _beamSecondsLeft = Math.Max(0.05f, Stats.ContinuousDuration);
+            _beamTickTimer = 0f;
+            UpdateBeamAim(enemies);
+            EmitBeamTick(enemies, hitBuffer);
+        }
+
+        /// <summary>
+        /// 照射期间保持射击不中断,但允许光束跟随当前目标(目标死亡后自动改瞄下一位);
+        /// 没有任何目标时维持最后方向,把剩余照射时间打完。
+        /// </summary>
+        private void UpdateBeamAim(IReadOnlyList<EnemyRuntime> enemies)
+        {
+            EnemyRuntime? target = FindEnemyById(enemies, _beamTargetId);
+            if (target == null || !target.Alive || !InRange(target))
+            {
+                int next = SelectTarget(enemies, BuildPacket(Stats.Damage));
+                if (next >= 0)
+                {
+                    if (_beamTargetId >= 0 && target != null) target.Status.ResetHeatMelt();
+                    target = enemies[next];
+                    _beamTargetId = target.Id.Index;
+                }
+                else
+                {
+                    _beamTargetId = -1;
+                    target = null;
+                }
+            }
+
+            if (target == null) return;
+            Vec2 toTarget = target.Position - Position;
+            _beamAngle = (float)Math.Atan2(toTarget.Y, toTarget.X);
+            Motor.SnapTo(_beamAngle);
+        }
+
+        private EnemyRuntime? FindEnemyById(IReadOnlyList<EnemyRuntime> enemies, int id)
+        {
+            if (id < 0) return null;
+            for (int i = 0; i < enemies.Count; i++)
+            {
+                if (enemies[i].Id.Index == id) return enemies[i];
+            }
+            return null;
+        }
+
+        private bool InRange(EnemyRuntime enemy)
+        {
+            if (Vec2.Distance(Position, enemy.Position) - enemy.Radius > Stats.Range) return false;
+            if (Stats.MinRange > 0f &&
+                Vec2.Distance(Position, enemy.Position) - enemy.Radius < Stats.MinRange) return false;
+            return true;
+        }
+
+        private void EmitBeamTick(IReadOnlyList<EnemyRuntime> enemies, List<EnemyRuntime> hitBuffer)
+        {
+            int beams = Math.Max(1, Stats.BeamCount);
+            float step = BeamStep(beams);
+            float amount = Stats.Damage * Math.Max(0.01f, Stats.ContinuousDamageScale);
+            float heat = Stats.Mechanic == TowerMechanics.ThermalMelt
+                ? Math.Max(0.001f, Stats.ContinuousInterval)
+                : 0f;
+
+            int totalHits = 0;
+            for (int b = 0; b < beams; b++)
+            {
+                float offset = beams == 1 ? 0f : (b - (beams - 1) * 0.5f) * step;
+                float angle = _beamAngle + offset;
+                var direction = new Vec2((float)Math.Cos(angle), (float)Math.Sin(angle));
+                HitscanResolver.Query(Position, direction, Stats.Range, HalfWidth(), enemies, hitBuffer);
+                totalHits += ApplyBeam(hitBuffer, amount, heat, enemies);
+                _shotTraces.Add(new ShotTrace(
+                    Position, direction, Stats.Range, HalfWidth(), true));
+            }
+
+            if (Stats.Mechanic == TowerMechanics.EnrichedPlutonium) ApplyDecayInRange(enemies);
+            LastHitCount = totalHits;
+        }
+
+        /// <summary>散射棱镜把多条束摊成 60° 扇形;其余情况维持原来的窄夹角。</summary>
+        private float BeamStep(int beams)
+        {
+            if (Stats.Mechanic == TowerMechanics.ScatterPrism && beams > 1)
+            {
+                return (float)(Math.PI / 3.0) / (beams - 1);
+            }
+            return BeamSpreadRad;
+        }
+
+        private void ResetBeamHeat(IReadOnlyList<EnemyRuntime> enemies)
+        {
+            if (_beamTargetId < 0) return;
+            for (int i = 0; i < enemies.Count; i++)
+            {
+                if (enemies[i].Id.Index != _beamTargetId) continue;
+                enemies[i].Status.ResetHeatMelt();
+                return;
+            }
+        }
+
+        private int ApplyBeam(
+            List<EnemyRuntime> hitBuffer,
+            float amount,
+            float heatSeconds,
+            IReadOnlyList<EnemyRuntime> enemies)
+        {
+            var packet = BuildPacket(amount);
 
             float retention = Stats.Retention;
             int hits = 0;
@@ -601,15 +857,102 @@ namespace Game.Entity
                 EnemyRuntime enemy = hitBuffer[i];
                 if (!enemy.Alive) continue;
 
-                float amount = DamageCalculator.Amount(packet, enemy.Def, enemy.BuildDamageContext());
-                enemy.ApplyDamage(amount, Stats.BlockForce);
+                // 进入该敌人瞬间尚未被其自身衰减消耗的留存,供贯穿内爆计算二段。
+                float remaining = Math.Max(0f, retention - enemy.Def.Decay(packet.Type));
+                float dealt = DamageCalculator.Amount(packet, enemy.Def, enemy.BuildDamageContext());
+                enemy.ApplyDamage(dealt, Stats.BlockForce);
                 hits++;
 
-                retention = PenetrationResolver.Consume(retention, packet, enemy.Def);
-                if (!PenetrationResolver.CanContinue(retention)) break;
+                if (heatSeconds > 0f) enemy.Status.AddHeatMelt(heatSeconds);
+                ApplyOnHitMechanic(enemy, dealt, remaining, enemies);
+
+                if (Stats.Mechanic == TowerMechanics.Implosion && enemy.Def.Size == EnemySize.Large)
+                {
+                    break;
+                }
+
+                // 热熔:能量衰减不再阻碍贯穿。
+                if (Stats.Mechanic != TowerMechanics.ThermalMelt)
+                {
+                    retention = PenetrationResolver.Consume(retention, packet, enemy.Def);
+                    if (!PenetrationResolver.CanContinue(retention)) break;
+                }
             }
 
             return hits;
+        }
+
+        /// <summary>机枪 / 激光唯一升级的附加机制。</summary>
+        private void ApplyOnHitMechanic(
+            EnemyRuntime enemy, float dealt, float remainingRetention, IReadOnlyList<EnemyRuntime> enemies)
+        {
+            switch (Stats.Mechanic)
+            {
+                case TowerMechanics.Incendiary:
+                    ApplyExtraElemental(enemy, 0.25f);
+                    enemy.Status.ApplyBurn(1, Stats.Pierce);
+                    break;
+
+                case TowerMechanics.CryoCore:
+                    ApplyExtraElemental(enemy, 0.25f);
+                    enemy.Status.ApplyChill(1);
+                    break;
+
+                case TowerMechanics.HighExplosive:
+                    ApplyExplosion(enemy, enemies);
+                    break;
+
+                case TowerMechanics.Implosion:
+                    if (enemy.Def.Size != EnemySize.Large) break;
+
+                    // 第二段:第一段 ×350% × 留存增伤(10%~250%),不经过护甲与衰减。
+                    float bonus = MathUtil.Clamp(remainingRetention * 0.25f, 0.10f, 2.50f);
+                    enemy.ApplyDamage(Stats.Damage * 3.5f * bonus, 0f);
+                    enemy.Status.ApplyArmorBreak();
+                    break;
+            }
+        }
+
+        private void ApplyExtraElemental(EnemyRuntime enemy, float fraction)
+        {
+            var packet = new DamagePacket
+            {
+                Amount = Stats.Damage * fraction,
+                Type = DamageType.Elemental,
+                Pierce = Stats.Pierce,
+                BlockForce = 0f,
+                Source = Id
+            };
+            float amount = DamageCalculator.Amount(packet, enemy.Def, enemy.BuildDamageContext());
+            enemy.ApplyDamage(amount, 0f);
+        }
+
+        private void ApplyExplosion(EnemyRuntime enemy, IReadOnlyList<EnemyRuntime> enemies)
+        {
+            _aoeTargets.Clear();
+            for (int i = 0; i < enemies.Count; i++) _aoeTargets.Add(enemies[i]);
+
+            var packet = new DamagePacket
+            {
+                Amount = Stats.Damage * 0.5f,
+                Type = DamageType.Explosive,
+                Pierce = Stats.Pierce,
+                BlockForce = Stats.BlockForce,
+                Source = Id
+            };
+            ExplosionResolver.Apply(
+                packet, enemy.Position, Math.Max(1f, Stats.ExplosionRadius), _aoeTargets, _aoeHitBuffer);
+        }
+
+        private void ApplyDecayInRange(IReadOnlyList<EnemyRuntime> enemies)
+        {
+            for (int i = 0; i < enemies.Count; i++)
+            {
+                EnemyRuntime enemy = enemies[i];
+                if (!enemy.Alive) continue;
+                if (Vec2.Distance(Position, enemy.Position) - enemy.Radius > Stats.Range) continue;
+                enemy.Status.ApplyDecay(1);
+            }
         }
     }
 }

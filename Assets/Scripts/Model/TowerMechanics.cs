@@ -5,6 +5,17 @@ namespace Game.Model
     {
         public const string None = "";
 
+        // 机枪塔
+        public const string Incendiary = "incendiary";
+        public const string HighExplosive = "he_round";
+        public const string CryoCore = "cryo_core";
+        public const string Implosion = "implosion";
+
+        // 激光塔
+        public const string ThermalMelt = "thermal_melt";
+        public const string ScatterPrism = "scatter_prism";
+        public const string EnrichedPlutonium = "enriched_plutonium";
+
         // 迫击炮
         public const string Cluster = "cluster";
         public const string Napalm = "napalm";

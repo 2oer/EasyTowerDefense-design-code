@@ -19,6 +19,18 @@ namespace Game.Model
         public float ExplosionRadius;
         public int BeamCount = 1;
         public bool Continuous;
+
+        /// <summary>持续照射总时长(秒);仅 Continuous = true 时有效。</summary>
+        public float ContinuousDuration;
+
+        /// <summary>持续照射的伤害结算间隔(秒)。</summary>
+        public float ContinuousInterval;
+
+        /// <summary>单次结算的伤害倍率(基础 0.75)。</summary>
+        public float ContinuousDamageScale = 1f;
+
+        /// <summary>一次照射结束后的重装间隔(秒)。</summary>
+        public float ContinuousRest;
         public ArmorPierce Pierce;
         public TowerStrategy Strategy;
         public DeliveryKind Delivery;

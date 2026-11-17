@@ -8,10 +8,10 @@ namespace Game.Battle
     {
         private readonly DifficultyDef _difficulty;
 
-        public EconomySystem(DifficultyDef difficulty)
+        public EconomySystem(DifficultyDef difficulty, int startGoldOverride = 0)
         {
             _difficulty = difficulty;
-            Gold = difficulty.StartGold;
+            Gold = startGoldOverride > 0 ? startGoldOverride : difficulty.StartGold;
         }
 
         public int Gold { get; private set; }

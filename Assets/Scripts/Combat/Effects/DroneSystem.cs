@@ -23,6 +23,9 @@ namespace Game.Combat
         public float ReturnTimer;
         public float BombTimer;
         public int BombsLeft;
+        public int BombSide = 1;
+        public int LastBombTargetId = -1;
+        public float BombTargetCooldown;
         public bool Expired;
 
         // 移动工厂 / 巡洋舰:被测本体位置由 DroneSystem 维护。
@@ -72,7 +75,10 @@ namespace Game.Combat
                 Life = 0f,
                 ReturnTimer = 0f,
                 BombTimer = 0f,
-                BombsLeft = stats.Mechanic == TowerMechanics.Thunderstorm ? 18 : 0,
+                BombsLeft = stats.Mechanic == TowerMechanics.Thunderstorm
+                    ? MathUtil.RoundToInt(Math.Max(1f, 18f * stats.DroneAmmo / 600f))
+                    : 0,
+                BombSide = 1,
                 PositronAmmo = stats.Mechanic == TowerMechanics.Battleship ? 8 : 0
             };
             _squads.Add(squad);
@@ -316,7 +322,8 @@ namespace Game.Combat
             squad.PositronTimer -= dt;
             if (squad.PositronTimer > 0f) return;
 
-            IAoETarget? victim = FindNearest(targets, squad.CarrierPosition, 30f);
+            // 战略—斩首:优先打当前生命值最高的目标。
+            IAoETarget? victim = FindHighestHp(targets, squad.CarrierPosition, 30f);
             if (victim == null) return;
 
             squad.PositronTimer = 4f;
@@ -332,6 +339,53 @@ namespace Game.Combat
                 Source = new EntityId(squad.TowerIndex, 0)
             };
             ApplyTo(victim, packet);
+
+            // 掠过伤害:只结算光束横向第一排(垂直距离 ≤3),单发 560。
+            Vec2 forward = victim.Position - squad.CarrierPosition;
+            if (forward.Length <= 0.01f) return;
+            forward = forward.Normalized;
+
+            var sweep = new DamagePacket
+            {
+                Amount = 560f,
+                Type = DamageType.Energy,
+                Pierce = ArmorPierce.High,
+                BlockForce = 4f,
+                Source = new EntityId(squad.TowerIndex, 0)
+            };
+
+            for (int i = 0; i < targets.Count; i++)
+            {
+                IAoETarget target = targets[i];
+                if (!target.Alive || target.Id.Index == victim.Id.Index) continue;
+
+                Vec2 relative = target.Position - squad.CarrierPosition;
+                float ahead = Vec2.Dot(relative, forward);
+                if (ahead < -target.Radius || ahead > 30f) continue;
+
+                float lateral = Math.Abs(Vec2.Cross(forward, relative));
+                if (lateral > 3f + target.Radius) continue;
+
+                ApplyTo(target, sweep);
+            }
+        }
+
+        /// <summary>在指定半径内选择当前生命值最高的目标(战略—斩首)。</summary>
+        private static IAoETarget? FindHighestHp(
+            IReadOnlyList<IAoETarget> targets, Vec2 origin, float range)
+        {
+            IAoETarget? best = null;
+            float bestHp = 0f;
+            for (int i = 0; i < targets.Count; i++)
+            {
+                IAoETarget target = targets[i];
+                if (!target.Alive) continue;
+                if (Vec2.Distance(origin, target.Position) - target.Radius > range) continue;
+                if (target.Hp <= bestHp) continue;
+                bestHp = target.Hp;
+                best = target;
+            }
+            return best;
         }
 
         // ---- 雷暴:矩形覆盖 + 按距离投弹 ---------------------------------------
@@ -339,6 +393,12 @@ namespace Game.Combat
         private void TickBomber(DroneSquad squad, float dt, IReadOnlyList<IAoETarget> targets)
         {
             TowerRuntimeStats stats = squad.Stats;
+            if (squad.BombTargetCooldown > 0f)
+            {
+                squad.BombTargetCooldown -= dt;
+                if (squad.BombTargetCooldown < 0f) squad.BombTargetCooldown = 0f;
+            }
+
             if (squad.BombsLeft <= 0)
             {
                 if (!squad.Returning) BeginBomberReturn(squad);
@@ -346,7 +406,8 @@ namespace Game.Combat
             }
 
             // 沿雷达指示的矩形带飞行:前向 1.0R、后向 0.2R、单侧 0.55R。
-            IAoETarget? signal = FindNearest(targets, squad.CarrierPosition, stats.RadarRange);
+            // 雷暴自身没有本体雷达,按自身当前位置索敌,避免飞离投放点后失去目标。
+            IAoETarget? signal = FindNearest(targets, squad.Position, stats.RadarRange);
             if (signal != null)
             {
                 Vec2 delta = signal.Position - squad.Position;
@@ -367,11 +428,24 @@ namespace Game.Combat
             float interval = MathUtil.Clamp(0.5f * baseSpeed / Math.Max(1f, stats.DroneSpeed), 0.15f, 0.55f);
             squad.BombTimer += interval;
 
-            IAoETarget? victim = FindNearest(targets, squad.Position, stats.RadarRange);
+            int exclude = squad.BombTargetCooldown > 0f ? squad.LastBombTargetId : -1;
+            IAoETarget? victim = FindNearest(targets, squad.Position, stats.RadarRange, exclude);
+            if (victim == null) victim = FindNearest(targets, squad.Position, stats.RadarRange);
             if (victim == null) return;
 
             bool heavy = squad.BombsLeft <= 2;
             squad.BombsLeft--;
+            squad.LastBombTargetId = victim.Id.Index;
+            squad.BombTargetCooldown = 0.4f;
+
+            // 航线两侧交替投弹,避免所有炸弹都落在同一点。
+            Vec2 toVictim = victim.Position - squad.Position;
+            Vec2 side = toVictim.Length > 0.01f
+                ? new Vec2(-toVictim.Y, toVictim.X).Normalized
+                : new Vec2(0f, 1f);
+            squad.BombSide = -squad.BombSide;
+            Vec2 center = victim.Position + side * (2f * squad.BombSide);
+
             var bomb = new DamagePacket
             {
                 Amount = heavy ? 400f : 150f,
@@ -379,7 +453,7 @@ namespace Game.Combat
                 Pierce = heavy ? ArmorPierce.High : ArmorPierce.Mid,
                 BlockForce = stats.BlockForce
             };
-            ExplosionResolver.Apply(bomb, victim.Position, heavy ? 2f : 4f, targets, _hitBuffer);
+            ExplosionResolver.Apply(bomb, center, heavy ? 2f : 4f, targets, _hitBuffer);
         }
 
         private static void BeginBomberReturn(DroneSquad squad)
@@ -397,7 +471,7 @@ namespace Game.Combat
         }
 
         private static IAoETarget? FindNearest(
-            IReadOnlyList<IAoETarget> targets, Vec2 origin, float range)
+            IReadOnlyList<IAoETarget> targets, Vec2 origin, float range, int excludeId = -1)
         {
             IAoETarget? best = null;
             float bestDistance = range;
@@ -405,6 +479,7 @@ namespace Game.Combat
             {
                 IAoETarget t = targets[i];
                 if (!t.Alive) continue;
+                if (t.Id.Index == excludeId) continue;
                 float distance = Vec2.Distance(origin, t.Position) - t.Radius;
                 if (distance > bestDistance) continue;
                 if (best != null && Math.Abs(distance - bestDistance) < 1e-4f &&

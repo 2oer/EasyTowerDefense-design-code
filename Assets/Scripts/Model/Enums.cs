@@ -34,7 +34,10 @@ namespace Game.Model
     public enum TowerStrategy
     {
         Focus = 0,
-        Spray = 1
+        Spray = 1,
+
+        /// <summary>战略:自动锁定当前生命值最高的目标(斩首),用于发射井 / 大舰巨炮。</summary>
+        Strategic = 2
     }
 
     public enum DeliveryKind

@@ -1,4 +1,4 @@
-[
+﻿[
     {
         "id":  "mg_lv2_quick_feed",
         "towerId":  "machine_gun",
@@ -422,7 +422,8 @@
                               "op":  "Mul",
                               "value":  0.5
                           }
-                      ]
+                      ],
+        "mechanic":  "incendiary"
     },
     {
         "id":  "mg_lv7_he",
@@ -452,7 +453,8 @@
                               "op":  "Set",
                               "value":  2.0
                           }
-                      ]
+                      ],
+        "mechanic":  "he_round"
     },
     {
         "id":  "mg_lv5_superconducting",
@@ -636,7 +638,8 @@
                               "op":  "Mul",
                               "value":  1.8
                           }
-                      ]
+                      ],
+        "mechanic":  "cryo_core"
     },
     {
         "id":  "mg_lv7_implosion",
@@ -661,7 +664,8 @@
                               "op":  "Mul",
                               "value":  5.0
                           }
-                      ]
+                      ],
+        "mechanic":  "implosion"
     },
     {
         "id":  "laser_lv2_efficient_cool",
@@ -1189,7 +1193,8 @@
                               "op":  "Set",
                               "value":  99.0
                           }
-                      ]
+                      ],
+        "mechanic":  "thermal_melt"
     },
     {
         "id":  "laser_lv7_quantum_pressure",
@@ -1244,7 +1249,8 @@
                               "op":  "Mul",
                               "value":  0.8
                           }
-                      ]
+                      ],
+        "mechanic":  "scatter_prism"
     },
     {
         "id":  "laser_lv7_enriched_plutonium",
@@ -1269,7 +1275,8 @@
                               "op":  "Set",
                               "value":  99.0
                           }
-                      ]
+                      ],
+        "mechanic":  "enriched_plutonium"
     },
     {
         "id":  "mortar_lv2_heavy_charge",
@@ -2161,7 +2168,8 @@
                           }
                       ],
         "mechanic":  "missile_silo",
-        "pierce":  "High"
+        "pierce":  "High",
+        "strategy":  "Strategic"
     },
     {
         "id":  "rocket_lv5_hive_expand",
@@ -3989,7 +3997,8 @@
                           }
                       ],
         "mechanic":  "battleship",
-        "pierce":  "High"
+        "pierce":  "High",
+        "strategy":  "Strategic"
     },
     {
         "id":  "drone_lv7_refined_hangar",

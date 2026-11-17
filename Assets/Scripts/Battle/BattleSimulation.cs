@@ -62,7 +62,7 @@ namespace Game.Battle
 
         public BattleSimulation(ModelDatabase db, string difficultyId, string mapId, ulong seed,
             float baseMaxHpOverride = 0f, string laserBranch = "focus", bool autoPlay = true,
-            bool manualWaveStart = false)
+            bool manualWaveStart = false, int startGoldOverride = 0)
         {
             AutoPlay = autoPlay;
             ManualWaveStart = manualWaveStart;
@@ -82,7 +82,7 @@ namespace Game.Battle
             _rng = new Rng(seed);
             _director = new WaveDirector(db, difficulty, map, _rng);
             _director.ManualStart = manualWaveStart;
-            _economy = new EconomySystem(difficulty);
+            _economy = new EconomySystem(difficulty, startGoldOverride);
             _upgrades = new UpgradeService(db, _economy);
             _combat = new CombatWorld(db.Effects);
             _combat.SquadConsumed = OnSquadConsumed;
@@ -97,6 +97,9 @@ namespace Game.Battle
         public Action<int, int, int, int>? OnWaveEnd;
         public Action<int, string, int>? OnUpgrade;
         public Action? OnFinished;
+
+        /// <summary>hitscan 开火事件(机枪 / 激光),只给表现层画曳光,不参与结算。</summary>
+        public Action<ShotTrace>? ShotFired;
 
         public int Tick { get; private set; }
         public float Time => Tick * Dt;
@@ -204,7 +207,12 @@ namespace Game.Battle
 
             for (int i = 0; i < _world.Towers.Count; i++)
             {
-                _world.Towers[i].Tick(Dt, _world.Enemies, _hitBuffer, _combat);
+                TowerAgent tower = _world.Towers[i];
+                tower.Tick(Dt, _world.Enemies, _hitBuffer, _combat);
+                for (int s = 0; s < tower.ShotTraces.Count; s++)
+                {
+                    ShotFired?.Invoke(tower.ShotTraces[s]);
+                }
             }
 
             _combat.Tick(Dt);

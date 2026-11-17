@@ -13,6 +13,11 @@ namespace Game.Combat
         Vec2 Position { get; }
         float Radius { get; }
         bool Alive { get; }
+
+        /// <summary>当前生命与最大生命,供战略索敌(斩首)与过量伤害判定使用。</summary>
+        float Hp { get; }
+        float MaxHp { get; }
+
         EnemyDef Def { get; }
         StatusSet Status { get; }
         DamageContext BuildDamageContext();

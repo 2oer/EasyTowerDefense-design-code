@@ -30,6 +30,10 @@ namespace Game.UnityBridge
         [Header("时间")]
         [SerializeField] private int speedMultiplier = 1;
 
+        [Header("测试")]
+        [Tooltip("初始金币覆盖;>0 时生效。默认 1000000 方便快速测试,正式发布请改回 0")]
+        [SerializeField] private int startGoldOverride = 1000000;
+
         private float _accumulator;
 
         public ModelDatabase Database { get; private set; }
@@ -59,7 +63,7 @@ namespace Game.UnityBridge
         {
             // autoPlay 必须在构造时就传入:构造函数会决定是否立刻执行 AI 建塔。
             Simulation = new BattleSimulation(Database, difficultyId, mapId, (ulong)seed,
-                0f, "focus", autoPlay, manualWaveStart);
+                0f, "focus", autoPlay, manualWaveStart, startGoldOverride);
             Simulation.OnFinished += HandleFinished;
             Simulation.Begin(maxWaves);
 

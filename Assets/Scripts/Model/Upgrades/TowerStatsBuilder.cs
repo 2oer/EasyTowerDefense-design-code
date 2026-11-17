@@ -51,15 +51,22 @@ namespace Game.Model
         }
 
         /// <summary>
-        /// 持续照射型:照射时长 = 弹容 ÷ 射速,重装间隔固定;结算频率 ×1.5(单次伤害 ×0.75、频率 ×2)。
-        /// 折算成等效射速后,塔按普通节奏开火,不再消耗弹容。
+        /// 持续照射型:照射时长 = 弹容 ÷ 射速,重装间隔固定;结算频率 ×2(单次伤害 ×0.75)。
+        /// 保留原始参数供 TowerAgent 执行不可中断的持续照射,同时把 FireRate 折算成等效射速供 UI / 回归使用。
         /// </summary>
         private static void ApplyContinuous(TowerRuntimeStats stats)
         {
             float interval = stats.ReloadTime > 0f ? stats.ReloadTime : 0.5f;
-            float duration = (stats.Ammo > 0 ? stats.Ammo : 100f) / Math.Max(0.0001f, stats.FireRate);
+            float rate = stats.FireRate > 0.0001f ? stats.FireRate : 0.0001f;
+            float duration = (stats.Ammo > 0 ? stats.Ammo : 100f) / rate;
             float duty = duration / (duration + interval);
-            stats.FireRate *= 1.5f * duty;
+
+            stats.ContinuousDuration = duration;
+            stats.ContinuousInterval = 0.5f / rate;
+            stats.ContinuousDamageScale = 0.75f;
+            stats.ContinuousRest = interval;
+
+            stats.FireRate = rate * 1.5f * duty;
             stats.Ammo = 1;
             stats.ReloadTime = 0f;
         }

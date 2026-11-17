@@ -51,6 +51,34 @@ namespace Game.UnityBridge
             public float Age;
         }
 
+        private sealed class BulletTracer
+        {
+            public LineRenderer Line;
+            public Vector3 Start;
+            public Vector3 End;
+            public int Age;
+        }
+
+        private sealed class BeamTracer
+        {
+            public GameObject Root;
+            public MeshRenderer FillRenderer;
+            public LineRenderer Border;
+            public int Age;
+        }
+
+        private readonly List<BulletTracer> _bulletTracers = new List<BulletTracer>();
+        private readonly List<BeamTracer> _beamTracers = new List<BeamTracer>();
+        private Material _tracerMaterial;
+        private Material _beamFillMaterial;
+        private static Mesh _beamQuadMesh;
+
+        private const int BulletExtendFrames = 3;
+        private const int BulletHoldFrames = 8;
+        private const int BulletFadeFrames = 8;
+        private const int BeamDelayFrames = 8;
+        private const int BeamFadeFrames = 8;
+
         private readonly Dictionary<AreaEffectField, AreaFieldView> _areas =
             new Dictionary<AreaEffectField, AreaFieldView>();
         private readonly List<AreaFieldView> _areaPool = new List<AreaFieldView>();
@@ -66,18 +94,27 @@ namespace Game.UnityBridge
 
         public void Bind(BattleSimulation simulation)
         {
-            if (_sim != null) _sim.Combat.Impacted -= HandleImpact;
+            if (_sim != null)
+            {
+                _sim.Combat.Impacted -= HandleImpact;
+                _sim.ShotFired -= HandleShot;
+            }
 
             _sim = simulation;
             ClearAll();
 
             if (_sim == null) return;
             _sim.Combat.Impacted += HandleImpact;
+            _sim.ShotFired += HandleShot;
         }
 
         private void OnDestroy()
         {
-            if (_sim != null) _sim.Combat.Impacted -= HandleImpact;
+            if (_sim != null)
+            {
+                _sim.Combat.Impacted -= HandleImpact;
+                _sim.ShotFired -= HandleShot;
+            }
         }
 
         public void SelectTower(int towerIndex)
@@ -96,6 +133,7 @@ namespace Game.UnityBridge
             SyncDrones();
             SyncRods();
             UpdateRings();
+            UpdateTracers();
         }
 
         // ---- 敌人 --------------------------------------------------------------
@@ -531,6 +569,234 @@ namespace Game.UnityBridge
             return _ringMaterial;
         }
 
+        // ---- 弹道 / 光束 ---------------------------------------------------------
+
+        private void HandleShot(ShotTrace trace)
+        {
+            if (trace.Rectangle) SpawnBeamTracer(trace);
+            else SpawnBulletTracer(trace);
+        }
+
+        /// <summary>实弹曳光:从塔外 1 单位处出发,3 帧内拉伸到射程端点,随后整条渐隐。</summary>
+        private void SpawnBulletTracer(ShotTrace trace)
+        {
+            Vector3 origin = ToWorld(trace.Origin);
+            Vector3 direction = new Vector3(trace.Direction.X, 0f, trace.Direction.Y);
+            if (direction.sqrMagnitude < 1e-6f) return;
+            direction.Normalize();
+
+            Vector3 start = origin + direction * 1f + Vector3.up * 0.05f;
+            Vector3 end = origin + direction * trace.Range + Vector3.up * 0.05f;
+
+            var go = new GameObject("BulletTracer");
+            go.transform.SetParent(transform, false);
+
+            var line = go.AddComponent<LineRenderer>();
+            line.useWorldSpace = true;
+            line.loop = false;
+            line.positionCount = 2;
+            line.numCapVertices = 2;
+            line.widthMultiplier = Mathf.Max(0.06f, trace.HalfWidth * 0.6f);
+            line.alignment = LineAlignment.View;
+            line.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            line.receiveShadows = false;
+            line.material = TracerMaterial();
+            line.SetPosition(0, start);
+            line.SetPosition(1, start);
+            line.startColor = Color.black;
+            line.endColor = Color.black;
+
+            _bulletTracers.Add(new BulletTracer
+            {
+                Line = line,
+                Start = start,
+                End = end,
+                Age = 0
+            });
+        }
+
+        /// <summary>激光束:与判定矩形同宽同长,白底 + 细黑边,延迟 2 帧后渐隐。</summary>
+        private void SpawnBeamTracer(ShotTrace trace)
+        {
+            Vector3 origin = ToWorld(trace.Origin);
+            Vector3 direction = new Vector3(trace.Direction.X, 0f, trace.Direction.Y);
+            if (direction.sqrMagnitude < 1e-6f) return;
+            direction.Normalize();
+
+            float width = Mathf.Max(0.05f, trace.HalfWidth * 2f);
+            float length = Mathf.Max(0.1f, trace.Range);
+
+            var root = new GameObject("LaserBeam");
+            root.transform.SetParent(transform, false);
+            root.transform.position = origin + Vector3.up * 0.03f;
+            root.transform.rotation = Quaternion.LookRotation(direction, Vector3.up);
+
+            var fillGo = new GameObject("Fill");
+            fillGo.transform.SetParent(root.transform, false);
+            fillGo.transform.localPosition = Vector3.zero;
+            fillGo.transform.localScale = new Vector3(width, 1f, length);
+
+            var filter = fillGo.AddComponent<MeshFilter>();
+            filter.sharedMesh = BeamQuadMesh();
+
+            var renderer = fillGo.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = BeamFillMaterial();
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+
+            var borderGo = new GameObject("Border");
+            borderGo.transform.SetParent(root.transform, false);
+            var border = borderGo.AddComponent<LineRenderer>();
+            border.useWorldSpace = false;
+            border.loop = true;
+            border.positionCount = 4;
+            border.numCapVertices = 0;
+            border.widthMultiplier = 0.04f;
+            border.alignment = LineAlignment.View;
+            border.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            border.receiveShadows = false;
+            border.material = TracerMaterial();
+
+            float half = width * 0.5f;
+            float lift = 0.01f;
+            border.SetPosition(0, new Vector3(-half, lift, 0f));
+            border.SetPosition(1, new Vector3(half, lift, 0f));
+            border.SetPosition(2, new Vector3(half, lift, length));
+            border.SetPosition(3, new Vector3(-half, lift, length));
+            border.startColor = new Color(0.62f, 0.64f, 0.68f, 1f);
+            border.endColor = new Color(0.62f, 0.64f, 0.68f, 1f);
+
+            _beamTracers.Add(new BeamTracer
+            {
+                Root = root,
+                FillRenderer = renderer,
+                Border = border,
+                Age = 0
+            });
+        }
+
+        private void UpdateTracers()
+        {
+            for (int i = _bulletTracers.Count - 1; i >= 0; i--)
+            {
+                BulletTracer tracer = _bulletTracers[i];
+                tracer.Age++;
+
+                float grow = Mathf.Clamp01((float)tracer.Age / BulletExtendFrames);
+                Vector3 tail = Vector3.Lerp(tracer.Start, tracer.End, grow);
+                tracer.Line.SetPosition(0, tracer.Start);
+                tracer.Line.SetPosition(1, tail);
+
+                float alpha;
+                if (tracer.Age <= BulletExtendFrames + BulletHoldFrames)
+                {
+                    alpha = 1f;
+                }
+                else
+                {
+                    alpha = 1f - (tracer.Age - BulletExtendFrames - BulletHoldFrames)
+                        / (float)BulletFadeFrames;
+                }
+
+                if (alpha <= 0f)
+                {
+                    Destroy(tracer.Line.gameObject);
+                    _bulletTracers.RemoveAt(i);
+                    continue;
+                }
+
+                var gradient = new Gradient();
+                gradient.SetKeys(
+                    new[]
+                    {
+                        new GradientColorKey(Color.black, 0f),
+                        new GradientColorKey(Color.black, 1f)
+                    },
+                    new[]
+                    {
+                        // 出发点先淡出,弹着点最后消失。
+                        new GradientAlphaKey(alpha * 0.05f, 0f),
+                        new GradientAlphaKey(alpha, 1f)
+                    });
+                tracer.Line.colorGradient = gradient;
+            }
+
+            for (int i = _beamTracers.Count - 1; i >= 0; i--)
+            {
+                BeamTracer beam = _beamTracers[i];
+                beam.Age++;
+
+                float alpha;
+                if (beam.Age <= BeamDelayFrames)
+                {
+                    alpha = 1f;
+                }
+                else
+                {
+                    alpha = 1f - (beam.Age - BeamDelayFrames) / (float)BeamFadeFrames;
+                }
+
+                if (alpha <= 0f)
+                {
+                    Destroy(beam.Root);
+                    _beamTracers.RemoveAt(i);
+                    continue;
+                }
+
+                var block = new MaterialPropertyBlock();
+                block.SetColor("_Color", new Color(1f, 1f, 1f, alpha * 0.92f));
+                beam.FillRenderer.SetPropertyBlock(block);
+
+                Color borderColor = new Color(0.62f, 0.64f, 0.68f, alpha);
+                beam.Border.startColor = borderColor;
+                beam.Border.endColor = borderColor;
+            }
+        }
+
+        private Material TracerMaterial()
+        {
+            if (_tracerMaterial != null) return _tracerMaterial;
+            Shader shader = Shader.Find("Sprites/Default");
+            if (shader == null) shader = Shader.Find("Unlit/Color");
+            _tracerMaterial = new Material(shader);
+            return _tracerMaterial;
+        }
+
+        private Material BeamFillMaterial()
+        {
+            if (_beamFillMaterial != null) return _beamFillMaterial;
+            Shader shader = Shader.Find("Sprites/Default");
+            if (shader == null) shader = Shader.Find("Unlit/Color");
+            _beamFillMaterial = new Material(shader);
+            return _beamFillMaterial;
+        }
+
+        /// <summary>单位矩形:宽 1(X)、长 1(+Z),运行时缩放到光束宽度与射程。</summary>
+        private static Mesh BeamQuadMesh()
+        {
+            if (_beamQuadMesh != null) return _beamQuadMesh;
+
+            var mesh = new Mesh { name = "BeamQuad" };
+            mesh.vertices = new[]
+            {
+                new Vector3(-0.5f, 0f, 0f),
+                new Vector3(0.5f, 0f, 0f),
+                new Vector3(0.5f, 0f, 1f),
+                new Vector3(-0.5f, 0f, 1f)
+            };
+            mesh.uv = new[]
+            {
+                new Vector2(0f, 0f),
+                new Vector2(1f, 0f),
+                new Vector2(1f, 1f),
+                new Vector2(0f, 1f)
+            };
+            mesh.triangles = new[] { 0, 2, 1, 0, 3, 2 };
+            mesh.RecalculateNormals();
+            _beamQuadMesh = mesh;
+            return mesh;
+        }
+
         public Vector3 ToWorld(Vec2 position)
         {
             return worldOrigin + new Vector3(position.X, 0f, position.Y) * unitScale;
@@ -565,6 +831,18 @@ namespace Game.UnityBridge
                 if (_rings[i].Line != null) Destroy(_rings[i].Line.gameObject);
             }
             _rings.Clear();
+
+            for (int i = 0; i < _bulletTracers.Count; i++)
+            {
+                if (_bulletTracers[i].Line != null) Destroy(_bulletTracers[i].Line.gameObject);
+            }
+            _bulletTracers.Clear();
+
+            for (int i = 0; i < _beamTracers.Count; i++)
+            {
+                if (_beamTracers[i].Root != null) Destroy(_beamTracers[i].Root);
+            }
+            _beamTracers.Clear();
 
             foreach (KeyValuePair<AreaEffectField, AreaFieldView> pair in _areas) pair.Value.Release();
             _areas.Clear();
